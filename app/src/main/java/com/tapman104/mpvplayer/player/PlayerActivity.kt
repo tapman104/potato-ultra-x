@@ -21,8 +21,8 @@ class PlayerActivity : ComponentActivity() {
         hideSystemBars()
 
         val uri: Uri? = intent.data
-        val path = uri?.path ?: ""
         val fileName = uri?.lastPathSegment ?: "Unknown"
+        val path = uri?.toString() ?: ""
 
         if (savedInstanceState == null && path.isNotEmpty()) {
             viewModel.loadFile(path)
