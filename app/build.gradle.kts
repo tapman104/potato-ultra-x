@@ -7,18 +7,48 @@ plugins {
 android {
     namespace = "com.tapman104.mpvplayer"
     compileSdk = 35
+
     defaultConfig {
         applicationId = "com.tapman104.mpvplayer"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
-    }
-    buildTypes {
-        release {
-            isMinifyEnabled = false
+        ndk {
+            abiFilters += setOf("arm64-v8a", "armeabi-v7a")
         }
     }
+
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a")
+            isUniversalApk = false
+        }
+    }
+
+    buildTypes {
+        debug {
+            isMinifyEnabled = false
+            isShrinkResources = false
+        }
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+    }
+
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging = false
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
