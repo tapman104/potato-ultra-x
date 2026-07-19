@@ -1,6 +1,8 @@
 package com.potato.player.feature.player
 
+import android.app.Activity
 import android.content.Context
+import android.content.pm.ActivityInfo
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -65,6 +67,10 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
         viewModelScope.launch { repository.tracks.collect       { v -> _uiState.update { it.copy(tracks = v) } } }
         viewModelScope.launch { repository.currentAudioTrackId.collect { v -> _uiState.update { it.copy(currentAudioTrackId = v) } } }
         viewModelScope.launch { repository.currentSubtitleTrackId.collect { v -> _uiState.update { it.copy(currentSubtitleTrackId = v) } } }
+    }
+
+    fun lockToLandscape(activity: Activity?) {
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
     }
 
     fun loadFile(uri: String) { repository.loadFile(uri) }

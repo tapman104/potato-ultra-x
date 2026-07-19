@@ -23,6 +23,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.potato.player.feature.player.controls.AudioTrackDialog
@@ -34,6 +37,7 @@ import com.potato.player.feature.player.controls.PlayerBottomControls
 import com.potato.player.feature.player.controls.PlayerDecoderDialog
 import com.potato.player.feature.player.controls.PlayerTopBar
 import com.potato.player.feature.player.controls.SubtitleTrackDialog
+import com.potato.player.util.findActivity
 import kotlinx.coroutines.delay
 
 @Composable
@@ -44,6 +48,21 @@ fun PlayerScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val activity = remember(context) { context.findActivity() }
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    DisposableEffect(lifecycleOwner, activity) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.lockToLandscape(activity)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        viewModel.lockToLandscape(activity)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     // Derive accurate display name (checking OpenableColumns for content URIs or clean path segment)
     val fileName = remember(encodedUri, context) {
