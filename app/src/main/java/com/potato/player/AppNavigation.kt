@@ -1,9 +1,11 @@
 package com.potato.player
 
+import android.content.pm.ActivityInfo
 import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -18,6 +20,7 @@ import com.potato.player.feature.home.HomeScreen
 import com.potato.player.feature.player.PlayerScreen
 import com.potato.player.feature.player.PlayerViewModel
 import com.potato.player.feature.player.PlayerViewModelFactory
+import com.potato.player.util.findActivity
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -70,6 +73,7 @@ fun AppNavigation(
 
         composable<PlayerRoute> { backStackEntry ->
             val route: PlayerRoute = backStackEntry.toRoute()
+            val activity = LocalContext.current.findActivity()
 
             DisposableEffect(Unit) {
                 engine.init()
@@ -86,7 +90,10 @@ fun AppNavigation(
                 videoUri  = route.videoUri,
                 title     = route.title,
                 viewModel = playerViewModel,
-                onBack    = { navController.popBackStack() }
+                onBack    = {
+                    activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                    navController.popBackStack()
+                }
             )
         }
     }

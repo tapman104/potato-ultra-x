@@ -25,7 +25,10 @@ class MpvEngine(private val context: Context) {
     private val initialized = AtomicBoolean(false)
 
     fun init() {
-        if (!initialized.compareAndSet(false, true)) return
+        if (!initialized.compareAndSet(false, true)) {
+            Log.w(TAG, "init() called on already-initialized engine — skipped")
+            return
+        }
         Log.d(TAG, "init")
 
         executor.execute {
@@ -70,7 +73,10 @@ class MpvEngine(private val context: Context) {
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     fun destroy() {
-        if (!initialized.compareAndSet(true, false)) return
+        if (!initialized.compareAndSet(true, false)) {
+            Log.w(TAG, "destroy() called on non-initialized engine — skipped")
+            return
+        }
         Log.d(TAG, "destroy")
 
         _initResult.resetReplayCache()

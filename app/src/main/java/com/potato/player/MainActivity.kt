@@ -7,6 +7,7 @@ import androidx.compose.runtime.*
 import androidx.core.view.WindowCompat
 import android.content.ContentResolver
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.view.WindowManager
 import androidx.compose.runtime.collectAsState
 import androidx.core.view.WindowInsetsCompat
@@ -23,6 +24,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         pendingIntent = intent
+
+        // Set orientation before setContent to prevent portrait flash
+        if (intent?.action == Intent.ACTION_VIEW) {
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        }
 
         // Immersive full-screen
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -105,5 +111,12 @@ class MainActivity : ComponentActivity() {
 
         val title = uri.lastPathSegment?.substringAfterLast('/') ?: ""
         navController.navigate(PlayerRoute(videoUri = uri.toString(), title = title))
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (isFinishing) {
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
     }
 }
