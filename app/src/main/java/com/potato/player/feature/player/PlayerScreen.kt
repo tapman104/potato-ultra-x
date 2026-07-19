@@ -32,7 +32,7 @@ import com.potato.player.feature.player.controls.AudioTrackDialog
 import com.potato.player.feature.player.controls.DoubleTapSeekOverlay
 import com.potato.player.feature.player.controls.DoubleTapSeekState
 import com.potato.player.feature.player.controls.HoldToFastForward
-import com.potato.player.feature.player.controls.PlaybackSpeedDialog
+import com.potato.player.feature.player.controls.PlayerRightSideSheet
 import com.potato.player.feature.player.controls.PlayerBottomControls
 import com.potato.player.feature.player.controls.PlayerDecoderDialog
 import com.potato.player.feature.player.controls.PlayerTopBar
@@ -219,13 +219,7 @@ fun PlayerScreen(
                     onSelectAudioTrack    = { viewModel.onShowAudioDialog() },
                     onSelectSubtitleTrack = { viewModel.onShowSubtitleDialog() },
                     onSelectDecoder       = { showDecoderDialog = true },
-                    onMoreOptions         = { viewModel.onMoreMenuToggle() },
-                    showMoreMenu          = uiState.showMoreMenu,
-                    onMoreMenuToggle      = { viewModel.onMoreMenuToggle() },
-                    onMoreMenuDismiss     = { viewModel.onMoreMenuDismiss() },
-                    onShowAudioDialog     = { viewModel.onShowAudioDialog() },
-                    onShowSubtitleDialog  = { viewModel.onShowSubtitleDialog() },
-                    onShowSpeedDialog     = { viewModel.onShowSpeedDialog() }
+                    onMoreOptions         = { viewModel.onMoreMenuToggle() }
                 )
             }
 
@@ -280,13 +274,17 @@ fun PlayerScreen(
             )
         }
 
-        if (uiState.showSpeedDialog) {
-            PlaybackSpeedDialog(
-                currentSpeed = uiState.playbackSpeed,
-                onSelectSpeed = { viewModel.setPlaybackSpeed(it) },
-                onDismiss = { viewModel.onDismissSpeedDialog() }
-            )
-        }
+        PlayerRightSideSheet(
+            visible = uiState.showMoreMenu || uiState.showSpeedDialog,
+            currentSpeed = uiState.playbackSpeed,
+            onSelectSpeed = { viewModel.setPlaybackSpeed(it) },
+            onShowAudioDialog = { viewModel.onShowAudioDialog() },
+            onShowSubtitleDialog = { viewModel.onShowSubtitleDialog() },
+            onDismiss = {
+                viewModel.onMoreMenuDismiss()
+                viewModel.onDismissSpeedDialog()
+            }
+        )
     }
 }
 

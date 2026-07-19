@@ -15,6 +15,7 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.potato.player.engine.MpvEngine
 import com.potato.player.engine.PlayerRepository
+import kotlinx.coroutines.flow.first
 
 class MainActivity : ComponentActivity() {
     private var pendingIntent by mutableStateOf<Intent?>(null)
@@ -64,6 +65,8 @@ class MainActivity : ComponentActivity() {
             )
 
             LaunchedEffect(navController, pendingIntent) {
+                if (pendingIntent == null) return@LaunchedEffect
+                navController.currentBackStackEntryFlow.first()
                 pendingIntent?.let { intent ->
                     handleViewIntent(intent, navController)
                     pendingIntent = null
@@ -79,20 +82,28 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleViewIntent(intent: Intent?, navController: NavController) {
-        if (intent?.action == Intent.ACTION_VIEW) {
-            val uri = intent.data ?: return
-            if (uri.scheme == ContentResolver.SCHEME_CONTENT || uri.scheme == "content") {
+        if (intent?.action != Intent.ACTION_VIEW) return
+        val uri = intent.data ?: return
+
+        if (uri.scheme == ContentResolver.SCHEME_CONTENT) {
+            val flags = intent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION
+            if (flags != 0) {
                 try {
                     contentResolver.takePersistableUriPermission(
-                        uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
                     )
-                } catch (e: Exception) {
-                    // Ignore if permission cannot be persisted
+                } catch (_: SecurityException) {
+                    // transient grant only — still have access for this session
                 }
             }
-            val title = uri.lastPathSegment ?: ""
-            navController.navigate(PlayerRoute(videoUri = uri.toString(), title = title))
+            try {
+                contentResolver.openFileDescriptor(uri, "r")?.close()
+            } catch (e: Exception) {
+                return // URI unreadable, bail
+            }
         }
+
+        val title = uri.lastPathSegment?.substringAfterLast('/') ?: ""
+        navController.navigate(PlayerRoute(videoUri = uri.toString(), title = title))
     }
 }

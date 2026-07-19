@@ -96,10 +96,6 @@ We will implement direct touch interactions on the video surface (`PlayerScreen.
 
 ---
 
-.
-
----
-
 ### Phase 5: Native Compose Navigation & App Engine Flow
 
 * [x] **Type-Safe Jetpack Compose Navigation (`AppNavigation.kt`)**
