@@ -41,8 +41,8 @@ class MpvSurface(private val executor: MpvCommandExecutor) : SurfaceHolder.Callb
         executor.execute {
             runCatching { MPVLib.setPropertyString("vo", "null") }
             runCatching { MPVLib.setPropertyString("force-window", "no") }
+            runCatching { MPVLib.detachSurface() }
         }
-        executor.detachSurface()
     }
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
