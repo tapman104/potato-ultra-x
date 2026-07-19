@@ -43,7 +43,8 @@ fun PlayerBottomControls(
     val sliderValue = if (durationMs > 0L) currentPositionMs.toFloat() / durationMs else 0f
     val displayFraction = if (dragFraction >= 0f) dragFraction else sliderValue
 
-    val bufferEndMs = if (cachedPositionMs > 0L) cachedPositionMs else currentPositionMs + bufferDurationMs
+    val cachedAheadMs = if (cachedPositionMs > 0L) cachedPositionMs else bufferDurationMs
+    val bufferEndMs = currentPositionMs + cachedAheadMs
     val bufferFraction = if (durationMs > 0L) (bufferEndMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
 
     val durationString = remember(durationMs) { TimeFormatter.formatMs(durationMs) }

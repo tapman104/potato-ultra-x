@@ -14,12 +14,6 @@ class MpvCommandExecutor {
         Thread(r, "mpv-engine-thread").also { engineThread = it }
     }
 
-    private val scheduler = Executors.newSingleThreadScheduledExecutor { r ->
-        Thread(r, "mpv-seek-scheduler").also { it.isDaemon = true }
-    }
-    @Volatile private var lastSeekTimeMs = 0L
-    @Volatile private var isSeekScheduled = false
-
     private val surfaceGeneration = AtomicInteger(0)
     private val pendingSeek       = AtomicReference<Double?>(null)
 
@@ -50,47 +44,20 @@ class MpvCommandExecutor {
         }
     }
 
-    // Debounced seek — rate limits approximate keyframe seeks to eliminate decoder lag/stuttering during scrubbing
+    // Coalesced seek — atomically stores the latest position without hitting JNI.
+    // The exact seek is committed instantly on finger lift via seekCommit.
     fun seekGesture(seconds: Double) {
         if (!seconds.isFinite()) return
         pendingSeek.set(seconds)
-        scheduleOrExecuteSeek()
     }
 
-    @Synchronized
-    private fun scheduleOrExecuteSeek() {
-        if (isSeekScheduled) return
-        val now = System.currentTimeMillis()
-        val elapsed = now - lastSeekTimeMs
-        val throttleMs = 120L
-        if (elapsed >= throttleMs) {
-            isSeekScheduled = true
-            execute {
-                isSeekScheduled = false
-                val target = pendingSeek.getAndSet(null) ?: return@execute
-                lastSeekTimeMs = System.currentTimeMillis()
-                MPVLib.command("seek", target.toString(), "absolute+keyframes")
-            }
-        } else {
-            isSeekScheduled = true
-            val delayMs = throttleMs - elapsed
-            scheduler.schedule({
-                isSeekScheduled = false
-                val target = pendingSeek.getAndSet(null) ?: return@schedule
-                execute {
-                    lastSeekTimeMs = System.currentTimeMillis()
-                    MPVLib.command("seek", target.toString(), "absolute+keyframes")
-                }
-            }, delayMs, java.util.concurrent.TimeUnit.MILLISECONDS)
-        }
-    }
-
-    // Final precise seek on finger lift. Cancels any pending throttled seek first.
+    // Final precise seek on finger lift. Clears pending seek and executes exact commit on the single JNI thread.
     fun seekCommit(seconds: Double) {
         if (!seconds.isFinite()) return
-        pendingSeek.set(null)
-        lastSeekTimeMs = 0L
-        execute { MPVLib.command("seek", seconds.toString(), "absolute+exact") }
+        execute {
+            pendingSeek.set(null)
+            MPVLib.command("seek", seconds.toString(), "absolute+exact")
+        }
     }
 
     fun loadFile(path: String) {
@@ -162,10 +129,7 @@ class MpvCommandExecutor {
     }
 
     fun stop()     { execute { MPVLib.command("stop") } }
-    fun shutdown() {
-        scheduler.shutdownNow()
-        executor.shutdown()
-    }
+    fun shutdown() { executor.shutdown() }
 
     companion object { private const val TAG = "MpvCommandExecutor" }
 }
