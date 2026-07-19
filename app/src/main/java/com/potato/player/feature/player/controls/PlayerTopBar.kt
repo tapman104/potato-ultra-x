@@ -15,9 +15,11 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun PlayerTopBar(
     fileName: String,
+    currentDecoder: String,
     onBack: () -> Unit,
     onSelectAudioTrack: () -> Unit,
     onSelectSubtitleTrack: () -> Unit,
+    onSelectDecoder: () -> Unit,
     onMoreOptions: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -54,10 +56,12 @@ fun PlayerTopBar(
                 .weight(1f)
         )
 
-        // Audio / Subtitle / More icons
+        // Audio / Subtitle / Decoder / More icons
         PlayerQuickActions(
+            currentDecoder        = currentDecoder,
             onSelectAudioTrack    = onSelectAudioTrack,
             onSelectSubtitleTrack = onSelectSubtitleTrack,
+            onSelectDecoder       = onSelectDecoder,
             onMoreOptions         = onMoreOptions
         )
     }

@@ -68,6 +68,13 @@ class MpvCommandExecutor {
         }
     }
 
+    fun setDecoder(hwdec: String) {
+        execute {
+            Log.d(TAG, "setDecoder: $hwdec")
+            MPVLib.setPropertyString("hwdec", hwdec)
+        }
+    }
+
     fun stop()     { execute { MPVLib.command("stop") } }
     fun shutdown() { executor.shutdown() }
 

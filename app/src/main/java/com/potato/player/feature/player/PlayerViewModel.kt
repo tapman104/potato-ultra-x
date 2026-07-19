@@ -11,14 +11,15 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class PlayerUiState(
-    val isPlaying:      Boolean = false,
-    val positionSec:    Double  = 0.0,
-    val durationSec:    Double  = 0.0,
-    val cachedSec:      Double  = 0.0,
-    val fileLoaded:     Boolean = false,
-    val isLoading:      Boolean = false,
-    val error:          String? = null,
-    val dragPositionSec: Double? = null   // non-null only while user is scrubbing
+    val isPlaying:       Boolean = false,
+    val positionSec:     Double  = 0.0,
+    val durationSec:     Double  = 0.0,
+    val cachedSec:       Double  = 0.0,
+    val fileLoaded:      Boolean = false,
+    val isLoading:       Boolean = false,
+    val error:           String? = null,
+    val dragPositionSec: Double? = null,  // non-null only while user is scrubbing
+    val hwdecCurrent:    String  = "HW+"
 )
 
 class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
@@ -38,16 +39,25 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
                 }
             }
         }
-        viewModelScope.launch { repository.isPaused.collect    { v -> _uiState.update { it.copy(isPlaying = !v) } } }
-        viewModelScope.launch { repository.positionSec.collect { v -> _uiState.update { it.copy(positionSec = v) } } }
-        viewModelScope.launch { repository.durationSec.collect { v -> _uiState.update { it.copy(durationSec = v) } } }
-        viewModelScope.launch { repository.cachedSec.collect   { v -> _uiState.update { it.copy(cachedSec = v) } } }
-        viewModelScope.launch { repository.fileLoaded.collect  { v -> _uiState.update { it.copy(fileLoaded = v) } } }
-        viewModelScope.launch { repository.isLoading.collect   { v -> _uiState.update { it.copy(isLoading = v) } } }
+        viewModelScope.launch { repository.isPaused.collect     { v -> _uiState.update { it.copy(isPlaying = !v) } } }
+        viewModelScope.launch { repository.positionSec.collect  { v -> _uiState.update { it.copy(positionSec = v) } } }
+        viewModelScope.launch { repository.durationSec.collect  { v -> _uiState.update { it.copy(durationSec = v) } } }
+        viewModelScope.launch { repository.cachedSec.collect    { v -> _uiState.update { it.copy(cachedSec = v) } } }
+        viewModelScope.launch { repository.fileLoaded.collect   { v -> _uiState.update { it.copy(fileLoaded = v) } } }
+        viewModelScope.launch { repository.isLoading.collect    { v -> _uiState.update { it.copy(isLoading = v) } } }
+        viewModelScope.launch { repository.hwdecCurrent.collect { v -> _uiState.update { it.copy(hwdecCurrent = v) } } }
     }
 
     fun loadFile(uri: String) { repository.loadFile(uri) }
     fun togglePlay()           { repository.togglePlay() }
+
+    fun setDecoder(mode: String) {
+        repository.setDecoder(mode)
+    }
+
+    fun seekRelative(offsetSec: Double) {
+        repository.seekRelative(offsetSec)
+    }
 
     fun onSliderDragStart(posSec: Double) {
         repository.onSliderDragStart()

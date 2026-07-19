@@ -5,10 +5,13 @@ internal object MpvProp {
     const val TIME_POS           = "time-pos"
     const val DURATION           = "duration"
     const val DEMUXER_CACHE_TIME = "demuxer-cache-time"
+    const val HWDEC              = "hwdec"
+    const val HWDEC_CURRENT      = "hwdec-current"
 }
 
 internal object MpvFmt {
     const val FLAG   = 3
+    const val STRING = 4
     const val DOUBLE = 5
 }
 

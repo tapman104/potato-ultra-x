@@ -86,6 +86,7 @@ class MpvOptionsConfigurator {
         MPVLib.observeProperty(MpvProp.TIME_POS,           MpvFmt.DOUBLE)
         MPVLib.observeProperty(MpvProp.DURATION,           MpvFmt.DOUBLE)
         MPVLib.observeProperty(MpvProp.DEMUXER_CACHE_TIME, MpvFmt.DOUBLE)
+        MPVLib.observeProperty(MpvProp.HWDEC_CURRENT,      MpvFmt.STRING)
     }
 
     companion object { private const val TAG = "MpvOptionsConfigurator" }

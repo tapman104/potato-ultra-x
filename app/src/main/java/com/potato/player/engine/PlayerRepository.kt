@@ -15,6 +15,7 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
     private val _cachedSec   = MutableStateFlow(0.0)
     private val _fileLoaded  = MutableStateFlow(false)
     private val _isLoading   = MutableStateFlow(false)
+    private val _hwdecCurrent = MutableStateFlow("HW+")
 
     val isPaused:    StateFlow<Boolean> = _isPaused
     val positionSec: StateFlow<Double>  = _positionSec
@@ -22,6 +23,7 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
     val cachedSec:   StateFlow<Double>  = _cachedSec
     val fileLoaded:  StateFlow<Boolean> = _fileLoaded
     val isLoading:   StateFlow<Boolean> = _isLoading
+    val hwdecCurrent: StateFlow<String> = _hwdecCurrent
 
     // Suppress MPV time-pos echo-backs while the slider is being dragged
     @Volatile private var isSliderSeeking  = false
@@ -46,6 +48,18 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
     fun seekCommit(sec: Double) {
         lastTimePosUpdate = 0L          // always accept the next time-pos after commit
         engine.executor.seekCommit(sec)
+    }
+
+    fun seekRelative(offsetSec: Double) {
+        val target = (_positionSec.value + offsetSec).coerceIn(
+            0.0,
+            _durationSec.value.takeIf { it > 0.0 } ?: Double.MAX_VALUE
+        )
+        seekCommit(target)
+    }
+
+    fun setDecoder(hwdec: String) {
+        engine.executor.setDecoder(hwdec)
     }
 
     fun onSliderDragStart() { isSliderSeeking = true  }
@@ -92,6 +106,14 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
             MpvProp.DEMUXER_CACHE_TIME -> {
                 val sec = value as? Double ?: return
                 _cachedSec.value = sec
+            }
+            MpvProp.HWDEC_CURRENT -> {
+                val current = value as? String ?: return
+                _hwdecCurrent.value = when {
+                    current == "no" || current.isEmpty() -> "SW"
+                    current.contains("copy") -> "HW+"
+                    else -> "HW"
+                }
             }
         }
     }
