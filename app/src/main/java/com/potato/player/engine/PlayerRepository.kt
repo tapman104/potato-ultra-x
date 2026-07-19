@@ -22,6 +22,8 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
     private val _tracks              = MutableStateFlow<List<TrackInfo>>(emptyList())
     private val _currentAudioTrackId    = MutableStateFlow(-1)
     private val _currentSubtitleTrackId = MutableStateFlow(-1)
+    private val _subScale               = MutableStateFlow(1.0)
+    private val _subPos                 = MutableStateFlow(100)
 
     private val _isFastForwarding = MutableStateFlow(false)
     val isFastForwarding: StateFlow<Boolean> = _isFastForwarding.asStateFlow()
@@ -39,6 +41,8 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
     val tracks: StateFlow<List<TrackInfo>>             = _tracks.asStateFlow()
     val currentAudioTrackId: StateFlow<Int>            = _currentAudioTrackId.asStateFlow()
     val currentSubtitleTrackId: StateFlow<Int>         = _currentSubtitleTrackId.asStateFlow()
+    val subScale: StateFlow<Double>                    = _subScale.asStateFlow()
+    val subPos: StateFlow<Int>                         = _subPos.asStateFlow()
 
     // Suppress MPV time-pos echo-backs while the slider is being dragged
     @Volatile private var isSliderSeeking  = false
@@ -146,6 +150,16 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
         }
     }
 
+    fun setSubScale(scale: Double) {
+        _subScale.value = scale
+        engine.executor.setSubScale(scale)
+    }
+
+    fun setSubPos(pos: Int) {
+        _subPos.value = pos
+        engine.executor.setSubPos(pos)
+    }
+
     fun onSliderDragStart() { isSliderSeeking = true  }
     fun onSliderDragEnd()   { isSliderSeeking = false }
 
@@ -166,6 +180,8 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
         _tracks.value      = emptyList()
         _currentAudioTrackId.value = -1
         _currentSubtitleTrackId.value = -1
+        _subScale.value = 1.0
+        _subPos.value   = 100
         _isFastForwarding.value = false
         isSliderSeeking = false
         lastTimePosUpdate = 0L
@@ -231,6 +247,14 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
                     current.contains("copy") -> "HW+"
                     else -> "HW"
                 }
+            }
+            MpvProp.SUB_SCALE -> {
+                val scale = (value as? Number)?.toDouble() ?: (value as? String)?.toDoubleOrNull() ?: return
+                _subScale.value = scale
+            }
+            MpvProp.SUB_POS -> {
+                val pos = (value as? Number)?.toInt() ?: (value as? String)?.toIntOrNull() ?: return
+                _subPos.value = pos
             }
         }
     }

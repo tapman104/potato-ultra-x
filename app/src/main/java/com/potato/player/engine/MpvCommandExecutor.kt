@@ -153,6 +153,20 @@ class MpvCommandExecutor {
         }
     }
 
+    fun setSubScale(scale: Double) {
+        execute {
+            if (!isAlive()) return@execute
+            MPVLib.setPropertyDouble("sub-scale", scale)
+        }
+    }
+
+    fun setSubPos(pos: Int) {
+        execute {
+            if (!isAlive()) return@execute
+            MPVLib.setPropertyInt("sub-pos", pos)
+        }
+    }
+
     fun stop()     { execute { if (isAlive()) MPVLib.command("stop") } }
     fun shutdown() {
         setAlive(false)

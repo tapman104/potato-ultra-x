@@ -31,6 +31,8 @@ data class PlayerUiState(
     val tracks:          List<TrackInfo> = emptyList(),
     val currentAudioTrackId: Int = -1,
     val currentSubtitleTrackId: Int = -1,
+    val subScale: Double = 1.0,
+    val subPos: Int = 100,
     val showAudioDialog: Boolean = false,
     val showSubtitleDialog: Boolean = false,
     val showSpeedDialog: Boolean = false,
@@ -67,6 +69,8 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
         viewModelScope.launch { repository.tracks.collect       { v -> _uiState.update { it.copy(tracks = v) } } }
         viewModelScope.launch { repository.currentAudioTrackId.collect { v -> _uiState.update { it.copy(currentAudioTrackId = v) } } }
         viewModelScope.launch { repository.currentSubtitleTrackId.collect { v -> _uiState.update { it.copy(currentSubtitleTrackId = v) } } }
+        viewModelScope.launch { repository.subScale.collect { v -> _uiState.update { it.copy(subScale = v) } } }
+        viewModelScope.launch { repository.subPos.collect   { v -> _uiState.update { it.copy(subPos = v) } } }
     }
 
     fun lockToLandscape(activity: Activity?) {
@@ -164,6 +168,19 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
         val path = resolveSubtitlePath(uri, context) ?: uri.toString()
         repository.addExternalSubtitle(path)
         onDismissSubtitleDialog()
+    }
+
+    fun setSubScale(scale: Double) { repository.setSubScale(scale) }
+    fun setSubPos(pos: Int) { repository.setSubPos(pos) }
+
+    fun setSubtitleAppearance(scale: Double, pos: Int) {
+        repository.setSubScale(scale)
+        repository.setSubPos(pos)
+    }
+
+    fun resetSubtitleAppearance() {
+        repository.setSubScale(1.0)
+        repository.setSubPos(100)
     }
 
     private fun resolveSubtitlePath(uri: Uri, context: Context): String? {

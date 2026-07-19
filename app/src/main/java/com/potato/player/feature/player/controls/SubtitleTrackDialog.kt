@@ -13,8 +13,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.RadioButtonChecked
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -23,6 +24,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.potato.player.engine.TrackInfo
+import com.potato.player.feature.player.PlayerViewModel
+import kotlin.math.roundToInt
 
 @Composable
 fun SubtitleTrackDialog(
@@ -30,8 +33,12 @@ fun SubtitleTrackDialog(
     currentTrackId: Int,
     onSelectTrack: (Int) -> Unit,
     onLoadExternal: (Uri) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    viewModel: PlayerViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 ) {
+    val uiState by viewModel.uiState.collectAsState()
+    var showAppearanceDialog by remember { mutableStateOf(false) }
+
     val accentColor = Color(0xFF90CAF9)
 
     val launcher = rememberLauncherForActivityResult(
@@ -146,6 +153,33 @@ fun SubtitleTrackDialog(
                         )
                     }
                 }
+
+                // Subtitle appearance option
+                item(key = "sub_appearance") {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .clickable { showAppearanceDialog = true }
+                            .padding(vertical = 12.dp, horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.8f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "Subtitle appearance...",
+                            color = Color.White,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 15.sp,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
             }
         },
         confirmButton = {},
@@ -159,4 +193,26 @@ fun SubtitleTrackDialog(
             }
         }
     )
+
+    if (showAppearanceDialog) {
+        val subScale = uiState.subScale.toFloat()
+        val subPos = uiState.subPos
+        val initialPosition = 1f - (subPos / 100f)
+        SubtitleAppearanceDialog(
+            initialSize = subScale,
+            initialPosition = initialPosition,
+            onApply = { size, position ->
+                val mpvPos = ((1f - position) * 100).roundToInt().coerceIn(0, 100)
+                viewModel.setSubtitleAppearance(size.toDouble(), mpvPos)
+                showAppearanceDialog = false
+            },
+            onDismiss = {
+                showAppearanceDialog = false
+            },
+            onReset = {
+                viewModel.resetSubtitleAppearance()
+                showAppearanceDialog = false
+            }
+        )
+    }
 }

@@ -12,12 +12,15 @@ internal object MpvProp {
     const val TRACK_LIST_COUNT   = "track-list/count"
     const val AID                = "aid"
     const val SID                = "sid"
+    const val SUB_SCALE          = "sub-scale"
+    const val SUB_POS            = "sub-pos"
 }
 
 internal object MpvFmt {
     const val FLAG   = 3
     const val STRING = 4
     const val DOUBLE = 5
+    const val INT64  = 6
 }
 
 internal object MpvEvent {
