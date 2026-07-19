@@ -5,8 +5,13 @@ internal object MpvProp {
     const val TIME_POS           = "time-pos"
     const val DURATION           = "duration"
     const val DEMUXER_CACHE_TIME = "demuxer-cache-time"
+    const val DEMUXER_CACHE_DURATION = "demuxer-cache-duration"
+    const val SPEED              = "speed"
     const val HWDEC              = "hwdec"
     const val HWDEC_CURRENT      = "hwdec-current"
+    const val TRACK_LIST_COUNT   = "track-list/count"
+    const val AID                = "aid"
+    const val SID                = "sid"
 }
 
 internal object MpvFmt {

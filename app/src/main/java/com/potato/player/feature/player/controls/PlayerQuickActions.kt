@@ -3,8 +3,13 @@ package com.potato.player.feature.player.controls
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AudioFile
+import androidx.compose.material.icons.filled.Audiotrack
+import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Subtitles
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -24,6 +29,11 @@ fun PlayerQuickActions(
     onSelectDecoder: () -> Unit,
     onMoreOptions: () -> Unit,
     modifier: Modifier = Modifier,
+    showMoreMenu: Boolean = false,
+    onMoreMenuDismiss: () -> Unit = {},
+    onShowAudioDialog: () -> Unit = {},
+    onShowSubtitleDialog: () -> Unit = {},
+    onShowSpeedDialog: () -> Unit = {},
 ) {
     val buttonModifier = PlayerControlsStyles.iconButtonModifier
 
@@ -32,11 +42,19 @@ fun PlayerQuickActions(
     val onSubtitleRef = rememberUpdatedState(onSelectSubtitleTrack)
     val onDecoderRef  = rememberUpdatedState(onSelectDecoder)
     val onMoreRef     = rememberUpdatedState(onMoreOptions)
+    val onShowAudioDialogRef = rememberUpdatedState(onShowAudioDialog)
+    val onShowSubtitleDialogRef = rememberUpdatedState(onShowSubtitleDialog)
+    val onShowSpeedDialogRef = rememberUpdatedState(onShowSpeedDialog)
+    val onMoreMenuDismissRef = rememberUpdatedState(onMoreMenuDismiss)
 
     val handleAudio    = remember { { onAudioRef.value()    } }
     val handleSubtitle = remember { { onSubtitleRef.value() } }
     val handleDecoder  = remember { { onDecoderRef.value()  } }
     val handleMore     = remember { { onMoreRef.value()     } }
+    val handleShowAudioDialog = remember { { onShowAudioDialogRef.value() } }
+    val handleShowSubtitleDialog = remember { { onShowSubtitleDialogRef.value() } }
+    val handleShowSpeedDialog = remember { { onShowSpeedDialogRef.value() } }
+    val handleMoreMenuDismiss = remember { { onMoreMenuDismissRef.value() } }
 
     Row(
         modifier              = modifier,
@@ -57,8 +75,33 @@ fun PlayerQuickActions(
                 fontWeight = FontWeight.Bold
             )
         }
-        IconButton(onClick = handleMore,     modifier = buttonModifier) {
-            Icon(Icons.Default.MoreVert,   contentDescription = "More options", tint = Color.White)
+        IconButton(onClick = handleShowSpeedDialog, modifier = buttonModifier) {
+            Icon(Icons.Default.Speed, contentDescription = "Playback speed", tint = Color.White)
+        }
+        Box {
+            IconButton(onClick = handleMore, modifier = buttonModifier) {
+                Icon(Icons.Default.MoreVert, contentDescription = "More options", tint = Color.White)
+            }
+            DropdownMenu(
+                expanded = showMoreMenu,
+                onDismissRequest = handleMoreMenuDismiss
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Audio Track") },
+                    leadingIcon = { Icon(Icons.Default.Audiotrack, null) },
+                    onClick = handleShowAudioDialog
+                )
+                DropdownMenuItem(
+                    text = { Text("Subtitle Track") },
+                    leadingIcon = { Icon(Icons.Default.ClosedCaption, null) },
+                    onClick = handleShowSubtitleDialog
+                )
+                DropdownMenuItem(
+                    text = { Text("Playback Speed") },
+                    leadingIcon = { Icon(Icons.Default.Speed, null) },
+                    onClick = handleShowSpeedDialog
+                )
+            }
         }
     }
 }

@@ -41,12 +41,12 @@ We have built a robust, reactive video player foundation powered by the native *
 ### Phase 1: Three-Dot Overflow Menu & Track Switch Dialogs
 We will expand the existing Three-Dot (`MoreVert`) menu in `PlayerTopBar.kt` to trigger comprehensive track selection dialogs:
 
-- [ ] **Audio Track Switch Dialog (`AudioTrackDialog.kt`)**
+- [x] **Audio Track Switch Dialog (`AudioTrackDialog.kt`)**
   * **Track Discovery**: Query `track-list/N/id`, `track-list/N/type`, `track-list/N/title`, and `track-list/N/lang` from MPV via `PlayerRepository` to list all available audio streams.
   * **Interactive Selection**: Present a clean radio-button list of audio tracks (e.g., *English (AC3)*, *Japanese (AAC)*).
   * **Real-Time Switching**: Execute `mpv_set_property_string("aid", selectedId)` instantly when picked, indicating the active track with a highlight.
 
-- [ ] **Subtitle Switch Dialog (`SubtitleTrackDialog.kt`)**
+- [x] **Subtitle Switch Dialog (`SubtitleTrackDialog.kt`)**
   * **Track Discovery**: Query all embedded subtitle tracks (`track-list/N/type = "sub"`).
   * **External Subtitle Support**: Provide a *"Load External Subtitle (.srt / .ass / .vtt)"* button utilizing Android's document picker (`sub-add`).
   * **Interactive Selection & Off Mode**: Allow switching between available subtitle tracks (`sid = id`) or completely turning subtitles off (`sid = no`).
@@ -55,7 +55,7 @@ We will expand the existing Three-Dot (`MoreVert`) menu in `PlayerTopBar.kt` to 
 ---
 
 ### Phase 2: Playback Speed Control Dialog
-- [ ] **Playback Speed Dialog (`PlaybackSpeedDialog.kt`)**
+- [x] **Playback Speed Dialog (`PlaybackSpeedDialog.kt`)**
   * **Preset Selector**: Quick chips/buttons for standard speeds: `0.25x`, `0.5x`, `0.75x`, `1.0x` (Normal), `1.25x`, `1.5x`, `2.0x`, and `3.0x`.
   * **Fine-Tuning Slider**: Smooth continuous slider allowing step-by-step adjustments (e.g., `1.1x`, `1.35x`) from `0.25x` to `4.0x`.
   * **Integration**: Accessible directly via the quick actions bar or the Three-Dot overflow menu, updating `mpv_set_property_string("speed", value)` via `PlayerRepository`.
@@ -63,7 +63,7 @@ We will expand the existing Three-Dot (`MoreVert`) menu in `PlayerTopBar.kt` to 
 ---
 
 ### Phase 3: Seek Bar Refinement
-- [ ] **Scrubber UX & Precision Improvements (`PlayerBottomControls.kt`)**
+- [x] **Scrubber UX & Precision Improvements (`PlayerBottomControls.kt`)**
   * **Debounced Scrubbing**: Separate continuous touch dragging (`onValueChange`) from final seek confirmation (`onValueChangeFinished`). While dragging, perform fast/approximate keyframe seeks (`seek <val> absolute+keyframes`) and on release perform exact seek (`seek <val> absolute+exact`) to eliminate decoder lag/stuttering.
   * **Live Time Preview**: Show a floating bubble indicating the target seek timestamp (`TimeFormatter.formatTime(targetTime)`) right above the thumb while scrubbing.
   * **Visual Buffer Indicator**: Display cached/buffered duration (`demuxer-cache-duration`) as a secondary progress track beneath the seek slider.

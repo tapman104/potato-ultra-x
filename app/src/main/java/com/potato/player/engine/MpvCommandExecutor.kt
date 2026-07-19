@@ -8,9 +8,17 @@ import java.util.concurrent.atomic.AtomicReference
 
 class MpvCommandExecutor {
 
+    @Volatile private var engineThread: Thread? = null
+
     private val executor = Executors.newSingleThreadExecutor { r ->
-        Thread(r, "mpv-engine-thread")
+        Thread(r, "mpv-engine-thread").also { engineThread = it }
     }
+
+    private val scheduler = Executors.newSingleThreadScheduledExecutor { r ->
+        Thread(r, "mpv-seek-scheduler").also { it.isDaemon = true }
+    }
+    @Volatile private var lastSeekTimeMs = 0L
+    @Volatile private var isSeekScheduled = false
 
     private val surfaceGeneration = AtomicInteger(0)
     private val pendingSeek       = AtomicReference<Double?>(null)
@@ -42,21 +50,46 @@ class MpvCommandExecutor {
         }
     }
 
-    // Coalesced seek — only the last position queued before the thread picks it up is sent.
-    // Used during scrubbing so hundreds of seeks don't back up on the queue.
+    // Debounced seek — rate limits approximate keyframe seeks to eliminate decoder lag/stuttering during scrubbing
     fun seekGesture(seconds: Double) {
         if (!seconds.isFinite()) return
         pendingSeek.set(seconds)
-        execute {
-            val target = pendingSeek.getAndSet(null) ?: return@execute
-            MPVLib.command("seek", target.toString(), "absolute+keyframes")
+        scheduleOrExecuteSeek()
+    }
+
+    @Synchronized
+    private fun scheduleOrExecuteSeek() {
+        if (isSeekScheduled) return
+        val now = System.currentTimeMillis()
+        val elapsed = now - lastSeekTimeMs
+        val throttleMs = 120L
+        if (elapsed >= throttleMs) {
+            isSeekScheduled = true
+            execute {
+                isSeekScheduled = false
+                val target = pendingSeek.getAndSet(null) ?: return@execute
+                lastSeekTimeMs = System.currentTimeMillis()
+                MPVLib.command("seek", target.toString(), "absolute+keyframes")
+            }
+        } else {
+            isSeekScheduled = true
+            val delayMs = throttleMs - elapsed
+            scheduler.schedule({
+                isSeekScheduled = false
+                val target = pendingSeek.getAndSet(null) ?: return@schedule
+                execute {
+                    lastSeekTimeMs = System.currentTimeMillis()
+                    MPVLib.command("seek", target.toString(), "absolute+keyframes")
+                }
+            }, delayMs, java.util.concurrent.TimeUnit.MILLISECONDS)
         }
     }
 
-    // Final precise seek on finger lift. Cancels any pending coalesced seek first.
+    // Final precise seek on finger lift. Cancels any pending throttled seek first.
     fun seekCommit(seconds: Double) {
         if (!seconds.isFinite()) return
         pendingSeek.set(null)
+        lastSeekTimeMs = 0L
         execute { MPVLib.command("seek", seconds.toString(), "absolute+exact") }
     }
 
@@ -75,8 +108,64 @@ class MpvCommandExecutor {
         }
     }
 
+    fun setPlaybackSpeed(speed: Double) {
+        execute {
+            Log.d(TAG, "setPlaybackSpeed: $speed")
+            MPVLib.setPropertyString("speed", speed.toString())
+        }
+    }
+
+    fun getPropertyInt(name: String): Int? {
+        if (executor.isShutdown) return null
+        return try {
+            if (Thread.currentThread() == engineThread) {
+                MPVLib.getPropertyInt(name)
+            } else {
+                executor.submit<Int?> { MPVLib.getPropertyInt(name) }.get()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "getPropertyInt error for $name", e)
+            null
+        }
+    }
+
+    fun getPropertyString(name: String): String? {
+        if (executor.isShutdown) return null
+        return try {
+            if (Thread.currentThread() == engineThread) {
+                MPVLib.getPropertyString(name)
+            } else {
+                executor.submit<String?> { MPVLib.getPropertyString(name) }.get()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "getPropertyString error for $name", e)
+            null
+        }
+    }
+
+    fun setAudioTrack(id: Int) {
+        execute { MPVLib.setPropertyString("aid", id.toString()) }
+    }
+
+    fun setSubtitleTrack(id: Int) {
+        execute {
+            val valStr = if (id == -1) "no" else id.toString()
+            MPVLib.setPropertyString("sid", valStr)
+        }
+    }
+
+    fun addExternalSubtitle(path: String, onAdded: () -> Unit = {}) {
+        execute {
+            MPVLib.command("sub-add", path, "select")
+            onAdded()
+        }
+    }
+
     fun stop()     { execute { MPVLib.command("stop") } }
-    fun shutdown() { executor.shutdown() }
+    fun shutdown() {
+        scheduler.shutdownNow()
+        executor.shutdown()
+    }
 
     companion object { private const val TAG = "MpvCommandExecutor" }
 }

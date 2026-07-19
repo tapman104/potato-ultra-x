@@ -21,6 +21,12 @@ fun PlayerTopBar(
     onSelectSubtitleTrack: () -> Unit,
     onSelectDecoder: () -> Unit,
     onMoreOptions: () -> Unit,
+    showMoreMenu: Boolean = false,
+    onMoreMenuToggle: () -> Unit = {},
+    onMoreMenuDismiss: () -> Unit = {},
+    onShowAudioDialog: () -> Unit = {},
+    onShowSubtitleDialog: () -> Unit = {},
+    onShowSpeedDialog: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val onBackRef     = rememberUpdatedState(onBack)
@@ -62,7 +68,12 @@ fun PlayerTopBar(
             onSelectAudioTrack    = onSelectAudioTrack,
             onSelectSubtitleTrack = onSelectSubtitleTrack,
             onSelectDecoder       = onSelectDecoder,
-            onMoreOptions         = onMoreOptions
+            onMoreOptions         = onMoreMenuToggle,
+            showMoreMenu          = showMoreMenu,
+            onMoreMenuDismiss     = onMoreMenuDismiss,
+            onShowAudioDialog     = onShowAudioDialog,
+            onShowSubtitleDialog  = onShowSubtitleDialog,
+            onShowSpeedDialog     = onShowSpeedDialog
         )
     }
 }

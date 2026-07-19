@@ -4,6 +4,7 @@ import `is`.xyz.mpv.MPVLib  // only for InitResult type re-export
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
 
@@ -13,17 +14,27 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
     private val _positionSec = MutableStateFlow(0.0)
     private val _durationSec = MutableStateFlow(0.0)
     private val _cachedSec   = MutableStateFlow(0.0)
+    private val _cacheDurationSec = MutableStateFlow(0.0)
+    private val _playbackSpeed    = MutableStateFlow(1.0)
     private val _fileLoaded  = MutableStateFlow(false)
     private val _isLoading   = MutableStateFlow(false)
     private val _hwdecCurrent = MutableStateFlow("HW+")
+    private val _tracks              = MutableStateFlow<List<TrackInfo>>(emptyList())
+    private val _currentAudioTrackId    = MutableStateFlow(-1)
+    private val _currentSubtitleTrackId = MutableStateFlow(-1)
 
     val isPaused:    StateFlow<Boolean> = _isPaused
     val positionSec: StateFlow<Double>  = _positionSec
     val durationSec: StateFlow<Double>  = _durationSec
     val cachedSec:   StateFlow<Double>  = _cachedSec
+    val cacheDurationSec: StateFlow<Double> = _cacheDurationSec
+    val playbackSpeed: StateFlow<Double>    = _playbackSpeed
     val fileLoaded:  StateFlow<Boolean> = _fileLoaded
     val isLoading:   StateFlow<Boolean> = _isLoading
     val hwdecCurrent: StateFlow<String> = _hwdecCurrent
+    val tracks: StateFlow<List<TrackInfo>>             = _tracks.asStateFlow()
+    val currentAudioTrackId: StateFlow<Int>            = _currentAudioTrackId.asStateFlow()
+    val currentSubtitleTrackId: StateFlow<Int>         = _currentSubtitleTrackId.asStateFlow()
 
     // Suppress MPV time-pos echo-backs while the slider is being dragged
     @Volatile private var isSliderSeeking  = false
@@ -62,6 +73,52 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
         engine.executor.setDecoder(hwdec)
     }
 
+    fun setPlaybackSpeed(speed: Double) {
+        val clamped = speed.coerceIn(0.25, 4.0)
+        _playbackSpeed.value = clamped
+        engine.executor.setPlaybackSpeed(clamped)
+    }
+
+    fun loadTracks() {
+        engine.executor.execute {
+            val count = engine.executor.getPropertyInt(MpvProp.TRACK_LIST_COUNT) ?: 0
+            val list = mutableListOf<TrackInfo>()
+            for (i in 0 until count) {
+                val type = engine.executor.getPropertyString("track-list/$i/type") ?: continue
+                if (type != "audio" && type != "sub") continue
+                val id = engine.executor.getPropertyInt("track-list/$i/id") ?: continue
+                val title = engine.executor.getPropertyString("track-list/$i/title")
+                val lang = engine.executor.getPropertyString("track-list/$i/lang")
+                val extStr = engine.executor.getPropertyString("track-list/$i/external")
+                val isExternal = extStr == "yes" || extStr == "true"
+                list.add(TrackInfo(id = id, type = type, title = title, lang = lang, isExternal = isExternal))
+            }
+            _tracks.value = list
+
+            val aidStr = engine.executor.getPropertyString(MpvProp.AID)
+            _currentAudioTrackId.value = aidStr?.toIntOrNull() ?: -1
+
+            val sidStr = engine.executor.getPropertyString(MpvProp.SID)
+            _currentSubtitleTrackId.value = sidStr?.toIntOrNull() ?: -1
+        }
+    }
+
+    fun setAudioTrack(id: Int) {
+        engine.executor.setAudioTrack(id)
+        _currentAudioTrackId.value = id
+    }
+
+    fun setSubtitleTrack(id: Int) {
+        engine.executor.setSubtitleTrack(id)
+        _currentSubtitleTrackId.value = id
+    }
+
+    fun addExternalSubtitle(path: String) {
+        engine.executor.addExternalSubtitle(path) {
+            loadTracks()
+        }
+    }
+
     fun onSliderDragStart() { isSliderSeeking = true  }
     fun onSliderDragEnd()   { isSliderSeeking = false }
 
@@ -73,6 +130,7 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
     override fun onFileLoaded() {
         _fileLoaded.value = true
         _isLoading.value  = false
+        loadTracks()
     }
 
     override fun onPlaybackStarted() {
@@ -106,6 +164,14 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
             MpvProp.DEMUXER_CACHE_TIME -> {
                 val sec = value as? Double ?: return
                 _cachedSec.value = sec
+            }
+            MpvProp.DEMUXER_CACHE_DURATION -> {
+                val sec = value as? Double ?: return
+                _cacheDurationSec.value = sec
+            }
+            MpvProp.SPEED -> {
+                val sec = value as? Double ?: return
+                _playbackSpeed.value = sec
             }
             MpvProp.HWDEC_CURRENT -> {
                 val current = value as? String ?: return

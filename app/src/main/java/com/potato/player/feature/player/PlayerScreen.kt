@@ -23,9 +23,12 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.potato.player.feature.player.controls.AudioTrackDialog
+import com.potato.player.feature.player.controls.PlaybackSpeedDialog
 import com.potato.player.feature.player.controls.PlayerBottomControls
 import com.potato.player.feature.player.controls.PlayerDecoderDialog
 import com.potato.player.feature.player.controls.PlayerTopBar
+import com.potato.player.feature.player.controls.SubtitleTrackDialog
 import kotlinx.coroutines.delay
 
 @Composable
@@ -172,10 +175,16 @@ fun PlayerScreen(
                     fileName              = fileName,
                     currentDecoder        = uiState.hwdecCurrent,
                     onBack                = { navController.popBackStack() },
-                    onSelectAudioTrack    = { /* Phase 4 */ },
-                    onSelectSubtitleTrack = { /* Phase 4 */ },
+                    onSelectAudioTrack    = { viewModel.onShowAudioDialog() },
+                    onSelectSubtitleTrack = { viewModel.onShowSubtitleDialog() },
                     onSelectDecoder       = { showDecoderDialog = true },
-                    onMoreOptions         = { /* Phase 8 */ }
+                    onMoreOptions         = { viewModel.onMoreMenuToggle() },
+                    showMoreMenu          = uiState.showMoreMenu,
+                    onMoreMenuToggle      = { viewModel.onMoreMenuToggle() },
+                    onMoreMenuDismiss     = { viewModel.onMoreMenuDismiss() },
+                    onShowAudioDialog     = { viewModel.onShowAudioDialog() },
+                    onShowSubtitleDialog  = { viewModel.onShowSubtitleDialog() },
+                    onShowSpeedDialog     = { viewModel.onShowSpeedDialog() }
                 )
             }
 
@@ -191,6 +200,8 @@ fun PlayerScreen(
                     // ViewModel stores seconds; controls work in milliseconds
                     currentPositionMs = (uiState.positionSec * 1000.0).toLong(),
                     durationMs        = (uiState.durationSec * 1000.0).toLong(),
+                    cachedPositionMs  = (uiState.cachedSec * 1000.0).toLong(),
+                    bufferDurationMs  = (uiState.cacheDurationSec * 1000.0).toLong(),
                     onTogglePlay      = viewModel::togglePlay,
                     onSeekGesture     = { ms -> viewModel.onSliderDragChange(ms / 1000.0) },
                     onSeekCommit      = { ms -> viewModel.onSliderDragEnd(ms / 1000.0) },
@@ -206,6 +217,33 @@ fun PlayerScreen(
                 currentDecoder = uiState.hwdecCurrent,
                 onSelectDecoder = { mode -> viewModel.setDecoder(mode) },
                 onDismiss = { showDecoderDialog = false }
+            )
+        }
+
+        if (uiState.showAudioDialog) {
+            AudioTrackDialog(
+                tracks = uiState.tracks.filter { it.type == "audio" },
+                currentTrackId = uiState.currentAudioTrackId,
+                onSelectTrack = { viewModel.onSelectAudioTrack(it) },
+                onDismiss = { viewModel.onDismissAudioDialog() }
+            )
+        }
+
+        if (uiState.showSubtitleDialog) {
+            SubtitleTrackDialog(
+                tracks = uiState.tracks.filter { it.type == "sub" },
+                currentTrackId = uiState.currentSubtitleTrackId,
+                onSelectTrack = { viewModel.onSelectSubtitleTrack(it) },
+                onLoadExternal = { uri -> viewModel.onLoadExternalSubtitle(uri, context) },
+                onDismiss = { viewModel.onDismissSubtitleDialog() }
+            )
+        }
+
+        if (uiState.showSpeedDialog) {
+            PlaybackSpeedDialog(
+                currentSpeed = uiState.playbackSpeed,
+                onSelectSpeed = { viewModel.setPlaybackSpeed(it) },
+                onDismiss = { viewModel.onDismissSpeedDialog() }
             )
         }
     }
