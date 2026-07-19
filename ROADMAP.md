@@ -102,7 +102,7 @@ We will implement direct touch interactions on the video surface (`PlayerScreen.
 
 ### Phase 5: Native Compose Navigation & App Engine Flow
 
-* [ ] **Type-Safe Jetpack Compose Navigation (`AppNavigation.kt`)**
+* [x] **Type-Safe Jetpack Compose Navigation (`AppNavigation.kt`)**
   * **Routes Definition**: Replace manual activity transitions or conditional rendering with type-safe `NavHost` routing (`HomeRoute` vs `PlayerRoute(val videoUri: String, val title: String)`).
   * **Engine Lifecycle Decoupling**: Ensure `MpvEngine` initializes cleanly upon application launch or upon entering `PlayerRoute`, and enters standby/idle when navigating back to `HomeRoute`.
   * **Clean Shutdown & Memory Management**: Prevent zombie MPV audio threads and surface leaks during rapid back/forward navigation or app backgrounding (`onPause` / `onDestroy`).

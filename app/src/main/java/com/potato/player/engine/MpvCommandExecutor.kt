@@ -29,9 +29,9 @@ class MpvCommandExecutor {
         execute {
             if (surfaceGeneration.get() == capturedGen) {
                 Log.d(TAG, "detachSurface gen=$capturedGen")
+                runCatching { MPVLib.detachSurface() }
                 runCatching { MPVLib.setPropertyString("vo", "null") }
                 runCatching { MPVLib.setPropertyString("force-window", "no") }
-                runCatching { MPVLib.detachSurface() }
             } else {
                 Log.d(TAG, "detachSurface skipped — stale gen=$capturedGen")
             }

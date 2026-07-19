@@ -42,7 +42,7 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun PlayerScreen(
-    encodedUri: String,
+    videoUri: String,
     title: String = "",
     viewModel: PlayerViewModel,
     onBack: () -> Unit,
@@ -66,8 +66,8 @@ fun PlayerScreen(
     }
 
     // Derive accurate display name or use provided title
-    val fileName = remember(encodedUri, title, context) {
-        if (title.isNotBlank()) title else resolveFileName(context, encodedUri)
+    val fileName = remember(videoUri, title, context) {
+        if (title.isNotBlank()) title else resolveFileName(context, videoUri)
     }
 
     var controlsVisible by remember { mutableStateOf(true) }
@@ -97,13 +97,12 @@ fun PlayerScreen(
     }
 
     // Load the video once the surface is ready; also handles config-change re-attach
-    LaunchedEffect(encodedUri) {
-        val uri = Uri.decode(encodedUri)
+    LaunchedEffect(videoUri) {
         viewModel.surface.setSurfaceReadyCallback {
-            viewModel.loadFile(uri)
+            viewModel.loadFile(videoUri)
         }
         if (viewModel.surface.hasSurface()) {
-            viewModel.loadFile(uri)
+            viewModel.loadFile(videoUri)
         }
     }
 
@@ -291,8 +290,8 @@ fun PlayerScreen(
     }
 }
 
-private fun resolveFileName(context: Context, encodedUri: String): String {
-    val decoded = Uri.decode(encodedUri)
+private fun resolveFileName(context: Context, videoUri: String): String {
+    val decoded = Uri.decode(videoUri)
     val parsedUri = Uri.parse(decoded)
 
     if (parsedUri.scheme == "content") {

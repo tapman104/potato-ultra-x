@@ -160,11 +160,15 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
         _durationSec.value = 0.0
         _cachedSec.value   = 0.0
         _cacheDurationSec.value = 0.0
+        _playbackSpeed.value = 1.0
+        normalPlaybackSpeed = 1.0
+        _hwdecCurrent.value = "HW+"
         _tracks.value      = emptyList()
         _currentAudioTrackId.value = -1
         _currentSubtitleTrackId.value = -1
         _isFastForwarding.value = false
         isSliderSeeking = false
+        lastTimePosUpdate = 0L
     }
 
     fun cleanup() { engine.dispatcher.removeListener(this) }

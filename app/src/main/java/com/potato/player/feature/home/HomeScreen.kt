@@ -64,6 +64,7 @@ fun HomeScreen(
     }
 }
 
+// TODO (Phase 6): Move title resolution to a background dispatcher/coroutine to avoid blocking the main thread during navigation.
 private fun resolveTitle(context: Context, uri: Uri): String {
     if (uri.scheme == "content") {
         try {

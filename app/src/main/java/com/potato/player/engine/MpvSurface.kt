@@ -10,7 +10,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 class MpvSurface(private val executor: MpvCommandExecutor) : SurfaceHolder.Callback {
 
-    private var attachedSurface: Surface? = null
+    @Volatile private var attachedSurface: Surface? = null
     private val pendingAttachSurface = AtomicReference<Surface?>(null)
     private var surfaceReadyCallback: (() -> Unit)? = null
 
@@ -38,6 +38,10 @@ class MpvSurface(private val executor: MpvCommandExecutor) : SurfaceHolder.Callb
         Log.d(TAG, "detachAndDisableVo")
         attachedSurface = null
         pendingAttachSurface.set(null)
+        executor.execute {
+            runCatching { MPVLib.setPropertyString("vo", "null") }
+            runCatching { MPVLib.setPropertyString("force-window", "no") }
+        }
         executor.detachSurface()
     }
 

@@ -63,17 +63,13 @@ fun AppNavigation(
             }
             HomeScreen(
                 onNavigateToPlayer = { uri, title ->
-                    val encodedUri = Uri.encode(uri)
-                    val encodedTitle = Uri.encode(title)
-                    navController.navigate(PlayerRoute(videoUri = encodedUri, title = encodedTitle))
+                    navController.navigate(PlayerRoute(videoUri = uri, title = title))
                 }
             )
         }
 
         composable<PlayerRoute> { backStackEntry ->
             val route: PlayerRoute = backStackEntry.toRoute()
-            val decodedUri = remember(route.videoUri) { Uri.decode(route.videoUri) }
-            val decodedTitle = remember(route.title) { Uri.decode(route.title) }
 
             DisposableEffect(Unit) {
                 engine.init()
@@ -87,10 +83,10 @@ fun AppNavigation(
             )
 
             PlayerScreen(
-                encodedUri = decodedUri,
-                title      = decodedTitle,
-                viewModel  = playerViewModel,
-                onBack     = { navController.popBackStack() }
+                videoUri  = route.videoUri,
+                title     = route.title,
+                viewModel = playerViewModel,
+                onBack    = { navController.popBackStack() }
             )
         }
     }
