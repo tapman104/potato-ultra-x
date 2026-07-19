@@ -6,6 +6,8 @@ import android.provider.OpenableColumns
 import android.view.SurfaceView
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -140,6 +142,18 @@ fun PlayerScreen(
                         }
                     )
                 }
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        do {
+                            val event = awaitPointerEvent()
+                        } while (event.changes.any { it.pressed })
+                        if (isLongPressActive) {
+                            isLongPressActive = false
+                            viewModel.stopFastForward()
+                        }
+                    }
+                }
         )
 
         // ── Double-Tap Seek Overlay Ripple ───────────────────────────────────
@@ -148,7 +162,9 @@ fun PlayerScreen(
         // ── Top Hold for 2x Fast-Forward Banner ──────────────────────────────
         HoldToFastForward(
             visible = uiState.isFastForwarding || isLongPressActive,
-            modifier = Modifier.align(Alignment.TopCenter)
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = if (controlsVisible) 72.dp else 36.dp)
         )
 
         // ── Loading indicator ────────────────────────────────────────────────

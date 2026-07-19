@@ -22,8 +22,8 @@ fun HoldToFastForward(
 ) {
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn() + slideInVertically { -it / 2 } + scaleIn(initialScale = 0.9f),
-        exit = fadeOut() + slideOutVertically { -it / 2 } + scaleOut(targetScale = 0.9f),
+        enter = fadeIn() + slideInVertically { -it } + scaleIn(initialScale = 0.9f),
+        exit = fadeOut() + slideOutVertically { -it } + scaleOut(targetScale = 0.9f),
         modifier = modifier
     ) {
         Card(
@@ -33,7 +33,7 @@ fun HoldToFastForward(
             ),
             border = BorderStroke(1.5.dp, Color(0xFFFFD700)), // Gold/Amber glowing border
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-            modifier = Modifier.padding(top = 48.dp)
+            modifier = Modifier.padding(horizontal = 16.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,

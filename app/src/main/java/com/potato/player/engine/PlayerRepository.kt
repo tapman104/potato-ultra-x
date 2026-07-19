@@ -199,8 +199,7 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
             }
             MpvProp.SPEED -> {
                 val sec = value as? Double ?: return
-                if (!_isFastForwarding.value) {
-                    normalPlaybackSpeed = sec
+                if (!_isFastForwarding.value && sec != 2.0) {
                     _playbackSpeed.value = sec
                 }
             }
