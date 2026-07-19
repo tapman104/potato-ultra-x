@@ -8,6 +8,7 @@ import androidx.core.view.WindowCompat
 import android.content.ContentResolver
 import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.content.res.Configuration
 import android.view.WindowManager
 import androidx.compose.runtime.collectAsState
 import androidx.core.view.WindowInsetsCompat
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.first
 
 class MainActivity : ComponentActivity() {
     private var pendingIntent by mutableStateOf<Intent?>(null)
+    private var mpvEngine: MpvEngine? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,6 +46,7 @@ class MainActivity : ComponentActivity() {
             // Engine lives for the entire activity lifetime
             val engine = remember { MpvEngine(applicationContext) }
             val repository = remember { PlayerRepository(engine) }
+            mpvEngine = engine
 
             DisposableEffect(Unit) {
                 engine.init()
@@ -113,6 +116,11 @@ class MainActivity : ComponentActivity() {
         navController.navigate(PlayerRoute(videoUri = uri.toString(), title = title))
     }
 
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        mpvEngine?.surface?.isRotating?.set(true)
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         if (isFinishing) {
@@ -120,3 +128,4 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+

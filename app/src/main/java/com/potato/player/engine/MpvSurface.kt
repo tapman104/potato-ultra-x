@@ -6,6 +6,7 @@ import android.util.Log
 import android.view.Surface
 import android.view.SurfaceHolder
 import `is`.xyz.mpv.MPVLib
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 class MpvSurface(private val executor: MpvCommandExecutor) : SurfaceHolder.Callback {
@@ -13,17 +14,41 @@ class MpvSurface(private val executor: MpvCommandExecutor) : SurfaceHolder.Callb
     @Volatile private var attachedSurface: Surface? = null
     private val pendingAttachSurface = AtomicReference<Surface?>(null)
     private var surfaceReadyCallback: (() -> Unit)? = null
+    private var lastHolderSurface: Surface? = null
+    val isRotating = AtomicBoolean(false)
 
     fun setSurfaceReadyCallback(cb: (() -> Unit)?) { surfaceReadyCallback = cb }
     fun hasSurface(): Boolean =
         attachedSurface != null || pendingAttachSurface.get() != null
 
     override fun surfaceCreated(holder: SurfaceHolder) {
+        lastHolderSurface = holder.surface
+        if (isRotating.get()) {
+            val surface = holder.surface
+            val rect = holder.surfaceFrame
+            val width = rect.width()
+            val height = rect.height()
+            val size = if (width > 0 && height > 0) "${width}x${height}" else ""
+            attachedSurface = surface
+            pendingAttachSurface.set(surface)
+            executor.execute {
+                if (!executor.isAlive()) return@execute
+                runCatching { MPVLib.attachSurface(surface) }
+                if (size.isNotEmpty()) {
+                    runCatching { MPVLib.setOptionString("android-surface-size", size) }
+                }
+                runCatching { MPVLib.setPropertyString("vo", "gpu") }
+                pendingAttachSurface.set(null)
+            }
+            isRotating.set(false)
+            return
+        }
         attachSurfaceInternal(holder.surface)
     }
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
         Log.d(TAG, "surfaceChanged ${width}x${height}")
+        lastHolderSurface = holder.surface
         attachSurfaceInternal(holder.surface)
         if (width > 0 && height > 0) {
             val size = "${width}x${height}"
@@ -49,8 +74,26 @@ class MpvSurface(private val executor: MpvCommandExecutor) : SurfaceHolder.Callb
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
         Log.d(TAG, "surfaceDestroyed")
-        detachAndDisableVo()
+        lastHolderSurface = null
+        if (isRotating.get()) {
+            attachedSurface = null
+            pendingAttachSurface.set(null)
+            executor.execute {
+                if (!executor.isAlive()) return@execute
+                runCatching { MPVLib.detachSurface() }
+            }
+        } else {
+            detachAndDisableVo()
+        }
     }
+
+    fun reattachSurface() {
+        val s = lastHolderSurface
+        if (s != null && s.isValid) {
+            attachSurfaceInternal(s)
+        }
+    }
+
 
     private fun attachSurfaceInternal(surface: Surface?) {
         if (surface == null || !surface.isValid || surface == attachedSurface) return

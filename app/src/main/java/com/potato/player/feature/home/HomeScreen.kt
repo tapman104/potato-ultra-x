@@ -2,7 +2,6 @@ package com.potato.player.feature.home
 
 import android.content.Context
 import android.net.Uri
-import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
@@ -16,6 +15,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.potato.player.util.MediaMetadataRepository
 import com.potato.player.util.findActivity
 
 @Composable
@@ -40,14 +40,23 @@ fun HomeScreen(
         }
     }
 
+    var pendingUri by remember { mutableStateOf<Uri?>(null) }
+
+    LaunchedEffect(pendingUri) {
+        pendingUri?.let { uri ->
+            val uriStr = uri.toString()
+            viewModel.onVideoPicked(uriStr)
+            val title = MediaMetadataRepository.resolveTitle(context, uri)
+            onNavigateToPlayer(uriStr, title)
+            pendingUri = null
+        }
+    }
+
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         if (uri != null) {
-            val uriStr = uri.toString()
-            viewModel.onVideoPicked(uriStr)
-            val title = resolveTitle(context, uri)
-            onNavigateToPlayer(uriStr, title)
+            pendingUri = uri
         }
     }
 
@@ -64,24 +73,3 @@ fun HomeScreen(
     }
 }
 
-// TODO (Phase 6): Move title resolution to a background dispatcher/coroutine to avoid blocking the main thread during navigation.
-private fun resolveTitle(context: Context, uri: Uri): String {
-    if (uri.scheme == "content") {
-        try {
-            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    if (nameIndex != -1) {
-                        val name = cursor.getString(nameIndex)
-                        if (!name.isNullOrBlank()) return name
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            // Fallback to path segment
-        }
-    }
-    return uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
-        ?: uri.toString().substringAfterLast('/').takeIf { it.isNotBlank() }
-        ?: "Video"
-}

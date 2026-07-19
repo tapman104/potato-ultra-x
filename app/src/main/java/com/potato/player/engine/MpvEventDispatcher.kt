@@ -11,6 +11,8 @@ interface MpvEventListener {
     fun onPlaybackStopped(endReason: Int)
     fun onPropertyChange(name: String, value: Any?)
     fun onError(message: String)
+    fun onVideoReconfig() {}
+    fun onSeek() {}
 }
 
 class MpvEventDispatcher : MPVLib.EventObserver {
@@ -41,6 +43,8 @@ class MpvEventDispatcher : MPVLib.EventObserver {
         when (eventId) {
             MpvEvent.FILE_LOADED      -> notify { it.onFileLoaded() }
             MpvEvent.PLAYBACK_RESTART -> notify { it.onPlaybackStarted() }
+            MpvEvent.VIDEO_RECONFIG   -> notify { it.onVideoReconfig() }
+            MpvEvent.SEEK             -> notify { it.onSeek() }
             MpvEvent.END_FILE -> {
                 val reason = runCatching {
                     eventNode.get("reason")?.asInt()?.toInt() ?: 0
@@ -49,6 +53,7 @@ class MpvEventDispatcher : MPVLib.EventObserver {
             }
         }
     }
+
 
     companion object { private const val TAG = "MpvEventDispatcher" }
 }

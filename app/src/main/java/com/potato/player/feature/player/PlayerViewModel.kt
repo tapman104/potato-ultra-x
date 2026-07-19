@@ -10,6 +10,8 @@ import com.potato.player.engine.InitResult
 import com.potato.player.engine.MpvSurface
 import com.potato.player.engine.PlayerRepository
 import com.potato.player.engine.TrackInfo
+import com.potato.player.util.MediaMetadataRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -165,8 +167,10 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
     }
 
     fun onLoadExternalSubtitle(uri: Uri, context: Context) {
-        val path = resolveSubtitlePath(uri, context) ?: uri.toString()
-        repository.addExternalSubtitle(path)
+        viewModelScope.launch(Dispatchers.IO) {
+            val path = MediaMetadataRepository.resolveSubtitlePath(context, uri) ?: uri.toString()
+            repository.addExternalSubtitle(path)
+        }
         onDismissSubtitleDialog()
     }
 
@@ -181,35 +185,6 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
     fun resetSubtitleAppearance() {
         repository.setSubScale(1.0)
         repository.setSubPos(100)
-    }
-
-    private fun resolveSubtitlePath(uri: Uri, context: Context): String? {
-        if (uri.scheme == "file") {
-            return uri.path
-        }
-        if (uri.scheme == "content") {
-            try {
-                var fileName = "external_sub"
-                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                    if (cursor.moveToFirst()) {
-                        val nameIdx = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
-                        if (nameIdx != -1) {
-                            cursor.getString(nameIdx)?.let { fileName = it }
-                        }
-                    }
-                }
-                val cacheFile = java.io.File(context.cacheDir, fileName)
-                context.contentResolver.openInputStream(uri)?.use { input ->
-                    cacheFile.outputStream().use { output ->
-                        input.copyTo(output)
-                    }
-                }
-                return cacheFile.absolutePath
-            } catch (e: Exception) {
-                android.util.Log.w("PlayerViewModel", "Failed to resolve subtitle content uri to file", e)
-            }
-        }
-        return uri.toString()
     }
 
     override fun onCleared() {

@@ -2,9 +2,9 @@ package com.potato.player.feature.player
 
 import android.content.Context
 import android.net.Uri
-import android.provider.OpenableColumns
 import android.view.SurfaceView
 import androidx.compose.animation.*
+import com.potato.player.util.MediaMetadataRepository
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -66,8 +66,11 @@ fun PlayerScreen(
     }
 
     // Derive accurate display name or use provided title
-    val fileName = remember(videoUri, title, context) {
-        if (title.isNotBlank()) title else resolveFileName(context, videoUri)
+    var fileName by remember(videoUri, title) { mutableStateOf(if (title.isNotBlank()) title else "Video") }
+    LaunchedEffect(videoUri, title, context) {
+        if (title.isBlank()) {
+            fileName = MediaMetadataRepository.resolveFileName(context, videoUri)
+        }
     }
 
     var controlsVisible by remember { mutableStateOf(true) }
@@ -286,29 +289,4 @@ fun PlayerScreen(
             }
         )
     }
-}
-
-private fun resolveFileName(context: Context, videoUri: String): String {
-    val decoded = Uri.decode(videoUri)
-    val parsedUri = Uri.parse(decoded)
-
-    if (parsedUri.scheme == "content") {
-        try {
-            context.contentResolver.query(parsedUri, null, null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    if (nameIndex != -1) {
-                        val name = cursor.getString(nameIndex)
-                        if (!name.isNullOrBlank()) return name
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            // Fallback to path segment below if query fails
-        }
-    }
-
-    return parsedUri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
-        ?: decoded.substringAfterLast('/').takeIf { it.isNotBlank() }
-        ?: "Video"
 }

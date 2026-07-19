@@ -59,6 +59,37 @@ class MpvEngine(private val context: Context) {
         }
     }
 
+    fun prepareDecoderSwitch(onReady: () -> Unit) {
+        if (!initialized.get() || !executor.isAlive()) {
+            onReady()
+            return
+        }
+        val completed = AtomicBoolean(false)
+        val listener = object : MpvEventListener {
+            override fun onFileLoaded() {}
+            override fun onPlaybackStarted() {}
+            override fun onPlaybackStopped(endReason: Int) {}
+            override fun onPropertyChange(name: String, value: Any?) {}
+            override fun onError(message: String) {}
+            override fun onVideoReconfig() {
+                if (completed.compareAndSet(false, true)) {
+                    dispatcher.removeListener(this)
+                    onReady()
+                    surface.reattachSurface()
+                }
+            }
+        }
+        dispatcher.addListener(listener)
+        surface.detachAndDisableVo()
+        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+            if (completed.compareAndSet(false, true)) {
+                dispatcher.removeListener(listener)
+                onReady()
+                surface.reattachSurface()
+            }
+        }, 300)
+    }
+
     fun enterStandby() {
         if (!initialized.get() || !executor.isAlive()) return
         Log.d(TAG, "enterStandby")
@@ -70,6 +101,7 @@ class MpvEngine(private val context: Context) {
             runCatching { MPVLib.setPropertyString("vo", "null") }
         }
     }
+
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     fun destroy() {

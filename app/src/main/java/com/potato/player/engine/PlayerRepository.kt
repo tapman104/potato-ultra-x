@@ -1,10 +1,13 @@
 package com.potato.player.engine
 
 import `is`.xyz.mpv.MPVLib  // only for InitResult type re-export
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
 
@@ -49,65 +52,103 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
     // Throttle time-pos updates to ~5 Hz; reset to 0 after seekCommit to snap immediately
     @Volatile private var lastTimePosUpdate = 0L
 
+    private val repoScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main.immediate + kotlinx.coroutines.SupervisorJob())
+    private var seekDebounceJob: kotlinx.coroutines.Job? = null
+    @Volatile private var isSeekingGate = false
+    @Volatile private var lastSeekTime = 0L
+    @Volatile private var pendingSeekCommitSec: Double? = null
+    @Volatile private var pendingSeekRelativeSec: Int = 0
+
     init { engine.dispatcher.addListener(this) }
+
+    private fun flushPendingSeeks() {
+        val now = System.currentTimeMillis()
+        if (now - lastSeekTime < 80) {
+            if (seekDebounceJob?.isActive != true) {
+                seekDebounceJob = repoScope.launch {
+                    delay(80 - (now - lastSeekTime) + 5)
+                    flushPendingSeeks()
+                }
+            }
+            return
+        }
+        val commitTarget = pendingSeekCommitSec
+        val relOffset = pendingSeekRelativeSec
+        pendingSeekCommitSec = null
+        pendingSeekRelativeSec = 0
+        if (commitTarget != null) {
+            lastTimePosUpdate = 0L
+            lastSeekTime = System.currentTimeMillis()
+            isSeekingGate = true
+            engine.executor.seekCommit(commitTarget)
+        } else if (relOffset != 0) {
+            lastSeekTime = System.currentTimeMillis()
+            isSeekingGate = true
+            engine.executor.seekExactRelative(relOffset)
+        } else {
+            isSeekingGate = false
+        }
+    }
 
     // ── Actions ──────────────────────────────────────────────────────────────
 
-    fun loadFile(path: String) {
-        _isLoading.value = true
-        engine.executor.loadFile(path)
-    }
-
+    fun loadFile(path: String) { _isLoading.value = true; engine.executor.loadFile(path) }
     fun togglePlay() { engine.executor.togglePlay() }
     fun play()       { engine.executor.play() }
     fun pause()      { engine.executor.pause() }
-
     fun seekGesture(sec: Double) { engine.executor.seekGesture(sec) }
 
     fun seekCommit(sec: Double) {
-        lastTimePosUpdate = 0L          // always accept the next time-pos after commit
-        engine.executor.seekCommit(sec)
+        val now = System.currentTimeMillis()
+        if (!isSeekingGate && now - lastSeekTime >= 80) {
+            lastTimePosUpdate = 0L; lastSeekTime = now; isSeekingGate = true
+            engine.executor.seekCommit(sec)
+        } else {
+            pendingSeekCommitSec = sec; pendingSeekRelativeSec = 0
+            if (seekDebounceJob?.isActive != true) {
+                seekDebounceJob = repoScope.launch { delay(80); flushPendingSeeks() }
+            }
+        }
     }
 
     fun seekRelative(offsetSec: Double) {
-        val target = (_positionSec.value + offsetSec).coerceIn(
-            0.0,
-            _durationSec.value.takeIf { it > 0.0 } ?: Double.MAX_VALUE
-        )
+        val target = (_positionSec.value + offsetSec).coerceIn(0.0, _durationSec.value.takeIf { it > 0.0 } ?: Double.MAX_VALUE)
         seekCommit(target)
     }
 
     fun seekExactRelative(offsetSec: Int) {
-        engine.executor.seekExactRelative(offsetSec)
+        val now = System.currentTimeMillis()
+        if (!isSeekingGate && now - lastSeekTime >= 80) {
+            lastSeekTime = now; isSeekingGate = true
+            engine.executor.seekExactRelative(offsetSec)
+        } else {
+            pendingSeekRelativeSec += offsetSec
+            if (seekDebounceJob?.isActive != true) {
+                seekDebounceJob = repoScope.launch { delay(80); flushPendingSeeks() }
+            }
+        }
     }
 
     fun startFastForward() {
         if (!_isFastForwarding.value) {
-            normalPlaybackSpeed = _playbackSpeed.value
-            _isFastForwarding.value = true
+            normalPlaybackSpeed = _playbackSpeed.value; _isFastForwarding.value = true
             engine.executor.setPlaybackSpeed(2.0)
         }
     }
 
     fun stopFastForward() {
         if (_isFastForwarding.value) {
-            _isFastForwarding.value = false
-            engine.executor.setPlaybackSpeed(normalPlaybackSpeed)
+            _isFastForwarding.value = false; engine.executor.setPlaybackSpeed(normalPlaybackSpeed)
             _playbackSpeed.value = normalPlaybackSpeed
         }
     }
 
-    fun setDecoder(hwdec: String) {
-        engine.executor.setDecoder(hwdec)
-    }
+    fun setDecoder(hwdec: String) { engine.prepareDecoderSwitch { engine.executor.setDecoder(hwdec) } }
 
     fun setPlaybackSpeed(speed: Double) {
         val clamped = speed.coerceIn(0.25, 4.0)
         normalPlaybackSpeed = clamped
-        if (!_isFastForwarding.value) {
-            _playbackSpeed.value = clamped
-            engine.executor.setPlaybackSpeed(clamped)
-        }
+        if (!_isFastForwarding.value) { _playbackSpeed.value = clamped; engine.executor.setPlaybackSpeed(clamped) }
     }
 
     fun loadTracks() {
@@ -121,143 +162,67 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
                 val title = engine.executor.getPropertyString("track-list/$i/title")
                 val lang = engine.executor.getPropertyString("track-list/$i/lang")
                 val extStr = engine.executor.getPropertyString("track-list/$i/external")
-                val isExternal = extStr == "yes" || extStr == "true"
-                list.add(TrackInfo(id = id, type = type, title = title, lang = lang, isExternal = isExternal))
+                list.add(TrackInfo(id = id, type = type, title = title, lang = lang, isExternal = extStr == "yes" || extStr == "true"))
             }
             _tracks.value = list
-
-            val aidStr = engine.executor.getPropertyString(MpvProp.AID)
-            _currentAudioTrackId.value = aidStr?.toIntOrNull() ?: -1
-
-            val sidStr = engine.executor.getPropertyString(MpvProp.SID)
-            _currentSubtitleTrackId.value = sidStr?.toIntOrNull() ?: -1
+            _currentAudioTrackId.value = engine.executor.getPropertyString(MpvProp.AID)?.toIntOrNull() ?: -1
+            _currentSubtitleTrackId.value = engine.executor.getPropertyString(MpvProp.SID)?.toIntOrNull() ?: -1
         }
     }
 
-    fun setAudioTrack(id: Int) {
-        engine.executor.setAudioTrack(id)
-        _currentAudioTrackId.value = id
-    }
-
-    fun setSubtitleTrack(id: Int) {
-        engine.executor.setSubtitleTrack(id)
-        _currentSubtitleTrackId.value = id
-    }
-
-    fun addExternalSubtitle(path: String) {
-        engine.executor.addExternalSubtitle(path) {
-            loadTracks()
-        }
-    }
-
-    fun setSubScale(scale: Double) {
-        _subScale.value = scale
-        engine.executor.setSubScale(scale)
-    }
-
-    fun setSubPos(pos: Int) {
-        _subPos.value = pos
-        engine.executor.setSubPos(pos)
-    }
-
-    fun onSliderDragStart() { isSliderSeeking = true  }
+    fun setAudioTrack(id: Int) { engine.executor.setAudioTrack(id); _currentAudioTrackId.value = id }
+    fun setSubtitleTrack(id: Int) { engine.executor.setSubtitleTrack(id); _currentSubtitleTrackId.value = id }
+    fun addExternalSubtitle(path: String) { engine.executor.addExternalSubtitle(path) { loadTracks() } }
+    fun setSubScale(scale: Double) { _subScale.value = scale; engine.executor.setSubScale(scale) }
+    fun setSubPos(pos: Int) { _subPos.value = pos; engine.executor.setSubPos(pos) }
+    fun onSliderDragStart() { isSliderSeeking = true }
     fun onSliderDragEnd()   { isSliderSeeking = false }
-
-    fun stop()    { engine.executor.stop() }
+    fun stop()              { engine.executor.stop() }
 
     fun enterStandby() {
         engine.enterStandby()
-        _fileLoaded.value = false
-        _isLoading.value  = false
-        _isPaused.value   = true
-        _positionSec.value = 0.0
-        _durationSec.value = 0.0
-        _cachedSec.value   = 0.0
-        _cacheDurationSec.value = 0.0
-        _playbackSpeed.value = 1.0
-        normalPlaybackSpeed = 1.0
-        _hwdecCurrent.value = "HW+"
-        _tracks.value      = emptyList()
-        _currentAudioTrackId.value = -1
-        _currentSubtitleTrackId.value = -1
-        _subScale.value = 1.0
-        _subPos.value   = 100
-        _isFastForwarding.value = false
-        isSliderSeeking = false
-        lastTimePosUpdate = 0L
+        _fileLoaded.value = false; _isLoading.value = false; _isPaused.value = true
+        _positionSec.value = 0.0; _durationSec.value = 0.0; _cachedSec.value = 0.0; _cacheDurationSec.value = 0.0
+        _playbackSpeed.value = 1.0; normalPlaybackSpeed = 1.0; _hwdecCurrent.value = "HW+"
+        _tracks.value = emptyList(); _currentAudioTrackId.value = -1; _currentSubtitleTrackId.value = -1
+        _subScale.value = 1.0; _subPos.value = 100; _isFastForwarding.value = false
+        isSliderSeeking = false; lastTimePosUpdate = 0L
     }
 
-    fun cleanup() { engine.dispatcher.removeListener(this) }
+    fun cleanup() { repoScope.cancel(); engine.dispatcher.removeListener(this) }
 
     // ── MpvEventListener ─────────────────────────────────────────────────────
 
-    override fun onFileLoaded() {
-        _fileLoaded.value = true
-        _isLoading.value  = false
-        loadTracks()
-    }
-
-    override fun onPlaybackStarted() {
-        _isPaused.value  = false
-        _isLoading.value = false
-    }
-
-    override fun onPlaybackStopped(endReason: Int) {
-        _isPaused.value = true
-        _isFastForwarding.value = false
-    }
+    override fun onFileLoaded() { _fileLoaded.value = true; _isLoading.value = false; loadTracks() }
+    override fun onPlaybackStarted() { _isPaused.value = false; _isLoading.value = false; flushPendingSeeks() }
+    override fun onSeek() { flushPendingSeeks() }
+    override fun onPlaybackStopped(endReason: Int) { _isPaused.value = true; _isFastForwarding.value = false }
 
     override fun onPropertyChange(name: String, value: Any?) {
         when (name) {
-            MpvProp.PAUSE -> {
-                val paused = value as? Boolean ?: return
-                _isPaused.value = paused
-            }
+            MpvProp.PAUSE -> (value as? Boolean)?.let { _isPaused.value = it }
             MpvProp.TIME_POS -> {
                 val sec = value as? Double ?: return
-                if (isSliderSeeking) return                     // suppress during drag
+                if (isSliderSeeking) return
                 val now = System.currentTimeMillis()
-                if (now - lastTimePosUpdate >= 200) {           // ~5 Hz throttle
-                    _positionSec.value = sec
-                    lastTimePosUpdate = now
-                }
+                if (now - lastTimePosUpdate >= 200) { _positionSec.value = sec; lastTimePosUpdate = now }
             }
-            MpvProp.DURATION -> {
-                val sec = value as? Double ?: return
-                _durationSec.value = sec
-            }
-            MpvProp.DEMUXER_CACHE_TIME -> {
-                val sec = value as? Double ?: return
-                _cachedSec.value = sec
-            }
-            MpvProp.DEMUXER_CACHE_DURATION -> {
-                val sec = value as? Double ?: return
-                _cacheDurationSec.value = sec
-            }
-            MpvProp.SPEED -> {
-                val sec = value as? Double ?: return
-                if (!_isFastForwarding.value && sec != 2.0) {
-                    _playbackSpeed.value = sec
-                }
-            }
-            MpvProp.HWDEC_CURRENT -> {
-                val current = value as? String ?: return
+            MpvProp.DURATION -> (value as? Double)?.let { _durationSec.value = it }
+            MpvProp.DEMUXER_CACHE_TIME -> (value as? Double)?.let { _cachedSec.value = it }
+            MpvProp.DEMUXER_CACHE_DURATION -> (value as? Double)?.let { _cacheDurationSec.value = it }
+            MpvProp.SPEED -> (value as? Double)?.let { if (!_isFastForwarding.value && it != 2.0) _playbackSpeed.value = it }
+            MpvProp.HWDEC_CURRENT -> (value as? String)?.let {
                 _hwdecCurrent.value = when {
-                    current == "no" || current.isEmpty() -> "SW"
-                    current.contains("copy") -> "HW+"
+                    it == "no" || it.isEmpty() -> "SW"
+                    it.contains("copy") -> "HW+"
                     else -> "HW"
                 }
             }
-            MpvProp.SUB_SCALE -> {
-                val scale = (value as? Number)?.toDouble() ?: (value as? String)?.toDoubleOrNull() ?: return
-                _subScale.value = scale
-            }
-            MpvProp.SUB_POS -> {
-                val pos = (value as? Number)?.toInt() ?: (value as? String)?.toIntOrNull() ?: return
-                _subPos.value = pos
-            }
+            MpvProp.SUB_SCALE -> ((value as? Number)?.toDouble() ?: (value as? String)?.toDoubleOrNull())?.let { _subScale.value = it }
+            MpvProp.SUB_POS -> ((value as? Number)?.toInt() ?: (value as? String)?.toIntOrNull())?.let { _subPos.value = it }
         }
     }
 
     override fun onError(message: String) { _isLoading.value = false }
 }
+
