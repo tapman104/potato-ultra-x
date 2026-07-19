@@ -24,6 +24,9 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.potato.player.feature.player.controls.AudioTrackDialog
+import com.potato.player.feature.player.controls.DoubleTapSeekOverlay
+import com.potato.player.feature.player.controls.DoubleTapSeekState
+import com.potato.player.feature.player.controls.HoldToFastForward
 import com.potato.player.feature.player.controls.PlaybackSpeedDialog
 import com.potato.player.feature.player.controls.PlayerBottomControls
 import com.potato.player.feature.player.controls.PlayerDecoderDialog
@@ -47,7 +50,8 @@ fun PlayerScreen(
 
     var controlsVisible by remember { mutableStateOf(true) }
     var showDecoderDialog by remember { mutableStateOf(false) }
-    var seekIndicatorText by remember { mutableStateOf<String?>(null) }
+    var doubleTapSeekState by remember { mutableStateOf<DoubleTapSeekState?>(null) }
+    var isLongPressActive by remember { mutableStateOf(false) }
 
     // Auto-hide controls after 4 seconds of inactivity when playing & not dragging seek bar
     LaunchedEffect(controlsVisible, uiState.isPlaying, uiState.dragPositionSec) {
@@ -57,11 +61,11 @@ fun PlayerScreen(
         }
     }
 
-    // Clear double-tap seek indicator after animation
-    LaunchedEffect(seekIndicatorText) {
-        if (seekIndicatorText != null) {
+    // Clear double-tap seek overlay after animation
+    LaunchedEffect(doubleTapSeekState?.triggerId) {
+        if (doubleTapSeekState != null) {
             delay(800L)
-            seekIndicatorText = null
+            doubleTapSeekState = null
         }
     }
 
@@ -104,46 +108,48 @@ fun PlayerScreen(
                 .fillMaxSize()
                 .pointerInput(Unit) {
                     detectTapGestures(
-                        onTap = {
-                            controlsVisible = !controlsVisible
+                        onPress = { offset ->
+                            tryAwaitRelease()
+                            if (isLongPressActive) {
+                                isLongPressActive = false
+                                viewModel.stopFastForward()
+                            }
+                        },
+                        onLongPress = { offset ->
+                            isLongPressActive = true
+                            viewModel.startFastForward()
                         },
                         onDoubleTap = { offset ->
                             val screenWidth = size.width
                             if (offset.x < screenWidth / 2f) {
-                                viewModel.seekRelative(-10.0)
-                                seekIndicatorText = "-10s"
+                                viewModel.seekExactRelative(-10)
+                                val accum = if (doubleTapSeekState != null && !doubleTapSeekState!!.isForward) {
+                                    doubleTapSeekState!!.totalSeconds + 10
+                                } else 10
+                                doubleTapSeekState = DoubleTapSeekState(isForward = false, totalSeconds = accum)
                             } else {
-                                viewModel.seekRelative(10.0)
-                                seekIndicatorText = "+10s"
+                                viewModel.seekExactRelative(10)
+                                val accum = if (doubleTapSeekState != null && doubleTapSeekState!!.isForward) {
+                                    doubleTapSeekState!!.totalSeconds + 10
+                                } else 10
+                                doubleTapSeekState = DoubleTapSeekState(isForward = true, totalSeconds = accum)
                             }
+                        },
+                        onTap = {
+                            controlsVisible = !controlsVisible
                         }
                     )
                 }
         )
 
-        // ── Double-tap Seek Indicator ────────────────────────────────────────
-        AnimatedVisibility(
-            visible = seekIndicatorText != null,
-            enter = fadeIn() + scaleIn(),
-            exit = fadeOut() + scaleOut(),
-            modifier = Modifier.align(Alignment.Center)
-        ) {
-            seekIndicatorText?.let { text ->
-                Box(
-                    modifier = Modifier
-                        .background(Color.Black.copy(alpha = 0.6f), shape = RoundedCornerShape(24.dp))
-                        .padding(horizontal = 24.dp, vertical = 14.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = text,
-                        color = Color.White,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        }
+        // ── Double-Tap Seek Overlay Ripple ───────────────────────────────────
+        DoubleTapSeekOverlay(seekState = doubleTapSeekState)
+
+        // ── Top Hold for 2x Fast-Forward Banner ──────────────────────────────
+        HoldToFastForward(
+            visible = uiState.isFastForwarding || isLongPressActive,
+            modifier = Modifier.align(Alignment.TopCenter)
+        )
 
         // ── Loading indicator ────────────────────────────────────────────────
         if (uiState.isLoading) {

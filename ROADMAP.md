@@ -73,14 +73,14 @@ We will expand the existing Three-Dot (`MoreVert`) menu in `PlayerTopBar.kt` to 
 ### Phase 4: Touch Interaction Controls (Double-Tap Seek & Hold 2x Speed)
 We will implement direct touch interactions on the video surface (`PlayerScreen.kt`) to make navigation and fast-forwarding instant and intuitive:
 
-- [ ] **Double-Tap to Seek (`DoubleTapSeekOverlay.kt`)**
+- [x] **Double-Tap to Seek (`DoubleTapSeekOverlay.kt`)**
   * **Zone Detection**: Divide the video touch surface into left and right double-tap zones using `pointerInput` and `detectTapGestures(onDoubleTap = { ... })`.
   * **Instant Relative Seek**:
     * **Left Zone Double-Tap**: Execute `mpv_command("seek", "-10", "relative+exact")` to jump back 10 seconds.
     * **Right Zone Double-Tap**: Execute `mpv_command("seek", "10", "relative+exact")` to jump forward 10 seconds.
   * **Visual Ripple Feedback**: Show animated circular ripple overlays (`-10s` / `+10s` with backward/forward skip icons) over the tapped zone upon activation.
 
-- [ ] **Hold for 2x Speed (`HoldToFastForward.kt`)**
+- [x] **Hold for 2x Speed (`HoldToFastForward.kt`)**
   * **Long Press Detection**: Detect long press gestures (`onLongPress` / gesture press state) anywhere across the video playback surface.
   * **Instant Speed Boost**: Immediately apply `mpv_set_property_string("speed", "2.0")` when held down, bypassing normal playback rate.
   * **Top Banner Feedback**: Display a sleek, glowing pill banner ("⚡ 2x Fast Forwarding") at top-center of the screen while held.

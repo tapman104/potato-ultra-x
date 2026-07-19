@@ -20,6 +20,7 @@ data class PlayerUiState(
     val cachedSec:       Double  = 0.0,
     val cacheDurationSec: Double = 0.0,
     val playbackSpeed:   Double  = 1.0,
+    val isFastForwarding: Boolean = false,
     val fileLoaded:      Boolean = false,
     val isLoading:       Boolean = false,
     val error:           String? = null,
@@ -57,6 +58,7 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
         viewModelScope.launch { repository.cachedSec.collect    { v -> _uiState.update { it.copy(cachedSec = v) } } }
         viewModelScope.launch { repository.cacheDurationSec.collect { v -> _uiState.update { it.copy(cacheDurationSec = v) } } }
         viewModelScope.launch { repository.playbackSpeed.collect { v -> _uiState.update { it.copy(playbackSpeed = v) } } }
+        viewModelScope.launch { repository.isFastForwarding.collect { v -> _uiState.update { it.copy(isFastForwarding = v) } } }
         viewModelScope.launch { repository.fileLoaded.collect   { v -> _uiState.update { it.copy(fileLoaded = v) } } }
         viewModelScope.launch { repository.isLoading.collect    { v -> _uiState.update { it.copy(isLoading = v) } } }
         viewModelScope.launch { repository.hwdecCurrent.collect { v -> _uiState.update { it.copy(hwdecCurrent = v) } } }
@@ -74,6 +76,18 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
 
     fun seekRelative(offsetSec: Double) {
         repository.seekRelative(offsetSec)
+    }
+
+    fun seekExactRelative(offsetSec: Int) {
+        repository.seekExactRelative(offsetSec)
+    }
+
+    fun startFastForward() {
+        repository.startFastForward()
+    }
+
+    fun stopFastForward() {
+        repository.stopFastForward()
     }
 
     fun onSliderDragStart(posSec: Double) {

@@ -60,6 +60,14 @@ class MpvCommandExecutor {
         }
     }
 
+    fun seekExactRelative(offsetSec: Int) {
+        execute {
+            pendingSeek.set(null)
+            Log.d(TAG, "seekExactRelative: $offsetSec")
+            MPVLib.command("seek", offsetSec.toString(), "relative+exact")
+        }
+    }
+
     fun loadFile(path: String) {
         execute {
             MPVLib.command("loadfile", path, "replace")

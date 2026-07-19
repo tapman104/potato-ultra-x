@@ -23,6 +23,10 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
     private val _currentAudioTrackId    = MutableStateFlow(-1)
     private val _currentSubtitleTrackId = MutableStateFlow(-1)
 
+    private val _isFastForwarding = MutableStateFlow(false)
+    val isFastForwarding: StateFlow<Boolean> = _isFastForwarding.asStateFlow()
+    private var normalPlaybackSpeed = 1.0
+
     val isPaused:    StateFlow<Boolean> = _isPaused
     val positionSec: StateFlow<Double>  = _positionSec
     val durationSec: StateFlow<Double>  = _durationSec
@@ -69,14 +73,37 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
         seekCommit(target)
     }
 
+    fun seekExactRelative(offsetSec: Int) {
+        engine.executor.seekExactRelative(offsetSec)
+    }
+
+    fun startFastForward() {
+        if (!_isFastForwarding.value) {
+            normalPlaybackSpeed = _playbackSpeed.value
+            _isFastForwarding.value = true
+            engine.executor.setPlaybackSpeed(2.0)
+        }
+    }
+
+    fun stopFastForward() {
+        if (_isFastForwarding.value) {
+            _isFastForwarding.value = false
+            engine.executor.setPlaybackSpeed(normalPlaybackSpeed)
+            _playbackSpeed.value = normalPlaybackSpeed
+        }
+    }
+
     fun setDecoder(hwdec: String) {
         engine.executor.setDecoder(hwdec)
     }
 
     fun setPlaybackSpeed(speed: Double) {
         val clamped = speed.coerceIn(0.25, 4.0)
-        _playbackSpeed.value = clamped
-        engine.executor.setPlaybackSpeed(clamped)
+        normalPlaybackSpeed = clamped
+        if (!_isFastForwarding.value) {
+            _playbackSpeed.value = clamped
+            engine.executor.setPlaybackSpeed(clamped)
+        }
     }
 
     fun loadTracks() {
@@ -140,6 +167,7 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
 
     override fun onPlaybackStopped(endReason: Int) {
         _isPaused.value = true
+        _isFastForwarding.value = false
     }
 
     override fun onPropertyChange(name: String, value: Any?) {
@@ -171,7 +199,10 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
             }
             MpvProp.SPEED -> {
                 val sec = value as? Double ?: return
-                _playbackSpeed.value = sec
+                if (!_isFastForwarding.value) {
+                    normalPlaybackSpeed = sec
+                    _playbackSpeed.value = sec
+                }
             }
             MpvProp.HWDEC_CURRENT -> {
                 val current = value as? String ?: return
