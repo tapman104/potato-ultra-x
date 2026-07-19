@@ -54,7 +54,11 @@ class MainActivity : ComponentActivity() {
                     val playerViewModel: PlayerViewModel = viewModel(
                         factory = PlayerViewModelFactory(repository)
                     )
-                    PlayerScreen(encodedUri = encodedUri, viewModel = playerViewModel)
+                    PlayerScreen(
+                        encodedUri    = encodedUri,
+                        viewModel     = playerViewModel,
+                        navController = navController
+                    )
                 }
             }
         }
