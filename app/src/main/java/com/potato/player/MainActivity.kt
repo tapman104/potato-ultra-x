@@ -39,6 +39,7 @@ class MainActivity : ComponentActivity() {
             val repository = remember { PlayerRepository(engine) }
 
             DisposableEffect(Unit) {
+                engine.init()
                 onDispose { engine.destroy() }
             }
 

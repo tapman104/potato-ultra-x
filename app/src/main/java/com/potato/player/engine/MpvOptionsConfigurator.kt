@@ -33,7 +33,7 @@ class MpvOptionsConfigurator {
 
         // Video output
         MPVLib.setOptionString("profile",      "fast")
-        MPVLib.setOptionString("vo",           "gpu")
+        MPVLib.setOptionString("vo",           "null")
         MPVLib.setOptionString("gpu-context",  "android")
 
         // Hardware decoding: HW+ → HW → SW fallback chain

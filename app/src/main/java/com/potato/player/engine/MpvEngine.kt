@@ -34,6 +34,7 @@ class MpvEngine(private val context: Context) {
                 MPVLib.create(context.applicationContext)
                 configurator.initOptions(context)
                 MPVLib.init()
+                executor.setAlive(true)
 
                 // Re-assert cache caps post-init (some builds reset on init)
                 MPVLib.setPropertyString("demuxer-max-bytes",      "50MiB")
@@ -48,6 +49,7 @@ class MpvEngine(private val context: Context) {
                 Log.d(TAG, "init complete")
             } catch (e: Exception) {
                 initialized.set(false)
+                executor.setAlive(false)
                 Log.e(TAG, "init failed", e)
                 _initResult.tryEmit(InitResult.Failure(e.message ?: "Unknown error"))
             }
@@ -55,10 +57,12 @@ class MpvEngine(private val context: Context) {
     }
 
     fun enterStandby() {
+        if (!initialized.get() || !executor.isAlive()) return
         Log.d(TAG, "enterStandby")
         surface.setSurfaceReadyCallback(null)
         surface.detachAndDisableVo()
         executor.execute {
+            if (!executor.isAlive()) return@execute
             runCatching { MPVLib.command("stop") }
             runCatching { MPVLib.setPropertyString("vo", "null") }
         }
@@ -74,9 +78,12 @@ class MpvEngine(private val context: Context) {
 
         // Submit destroy task BEFORE shutdown so it actually runs
         executor.execute {
-            runCatching { MPVLib.removeObserver(dispatcher) }
-            runCatching { MPVLib.destroy() }
-            Log.d(TAG, "destroy complete")
+            if (executor.isAlive()) {
+                executor.setAlive(false)
+                runCatching { MPVLib.removeObserver(dispatcher) }
+                runCatching { MPVLib.destroy() }
+                Log.d(TAG, "destroy complete")
+            }
         }
 
         // shutdown AFTER submitting — never call shutdown() inside an execute{} block
