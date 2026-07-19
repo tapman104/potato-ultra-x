@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Outer Glowing Media Ring (Rounded Hexagon / Circle) -->
+    <path
+        android:pathData="M54,22 C71.67,22 86,36.33 86,54 C86,71.67 71.67,86 54,86 C36.33,86 22,71.67 22,54 C22,36.33 36.33,22 54,22 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="22"
+                android:startY="22"
+                android:endX="86"
+                android:endY="86"
+                android:startColor="#6A0DAD"
+                android:endColor="#1F1147"/>
+        </aapt:attr>
+    </path>
+    
+    <!-- Neon Cyan & Electric Violet Outer Accent Ring (Stroke) -->
+    <path
+        android:pathData="M54,24 C70.57,24 84,37.43 84,54 C84,70.57 70.57,84 54,84 C37.43,84 24,70.57 24,54 C24,37.43 37.43,24 54,24 Z"
+        android:strokeWidth="1.5">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:type="linear"
+                android:startX="24"
+                android:startY="24"
+                android:endX="84"
+                android:endY="84"
+                android:startColor="#00F5D4"
+                android:endColor="#9D4EDD"/>
+        </aapt:attr>
+    </path>
+
+    <!-- Stylized Potato / Player Core Capsule Shadow -->
+    <path
+        android:pathData="M40,34 C48,30 63,31 69,38 C76,46 75,61 68,69 C61,77 47,78 39,70 C31,62 31,40 40,34 Z"
+        android:fillColor="#100A26"
+        android:fillAlpha="0.6"/>
+
+    <!-- Stylized Potato / Glass Shield Core -->
+    <path
+        android:pathData="M40,33 C48,29 63,30 69,37 C76,45 75,60 68,68 C61,76 47,77 39,69 C31,61 31,39 40,33 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="34"
+                android:startY="33"
+                android:endX="72"
+                android:endY="72"
+                android:startColor="#3C1671"
+                android:endColor="#190E38"/>
+        </aapt:attr>
+    </path>
+
+    <!-- Inner Core Cyan Glow Accent (Top Left Arc) -->
+    <path
+        android:pathData="M41,35 C47,32 58,32 64,37 C66,39 67,41 68,44 C68,44 65,40 61,38 C55,35 46,35 41,38 C38,40 36,44 35,48 C35,48 35,42 41,35 Z"
+        android:fillColor="#00F5D4"
+        android:fillAlpha="0.8"/>
+
+    <!-- Ultra-Modern Play Triangle Shadow -->
+    <path
+        android:pathData="M47,42 L68,55 L47,68 Z"
+        android:fillColor="#080414"
+        android:fillAlpha="0.5"/>
+
+    <!-- Main Play Triangle (Electric Violet Gradient) -->
+    <path
+        android:pathData="M46,40 L67,53 L46,66 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="46"
+                android:startY="40"
+                android:endX="67"
+                android:endY="66"
+                android:startColor="#E0AAFF"
+                android:endColor="#7B2CBF"/>
+        </aapt:attr>
+    </path>
+
+    <!-- Play Button Highlight Facet (Top Half) -->
+    <path
+        android:pathData="M46,40 L67,53 L46,53 Z"
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.25"/>
+
+    <!-- Neon Lightning Cut / Accent inside Triangle -->
+    <path
+        android:pathData="M46,40 L49,40 L49,66 L46,66 Z"
+        android:fillColor="#00F5D4"
+        android:fillAlpha="0.9"/>
+</vector>
