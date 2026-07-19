@@ -150,6 +150,23 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
     fun onSliderDragEnd()   { isSliderSeeking = false }
 
     fun stop()    { engine.executor.stop() }
+
+    fun enterStandby() {
+        engine.enterStandby()
+        _fileLoaded.value = false
+        _isLoading.value  = false
+        _isPaused.value   = true
+        _positionSec.value = 0.0
+        _durationSec.value = 0.0
+        _cachedSec.value   = 0.0
+        _cacheDurationSec.value = 0.0
+        _tracks.value      = emptyList()
+        _currentAudioTrackId.value = -1
+        _currentSubtitleTrackId.value = -1
+        _isFastForwarding.value = false
+        isSliderSeeking = false
+    }
+
     fun cleanup() { engine.dispatcher.removeListener(this) }
 
     // ── MpvEventListener ─────────────────────────────────────────────────────

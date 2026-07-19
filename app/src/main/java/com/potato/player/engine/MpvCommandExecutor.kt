@@ -22,13 +22,16 @@ class MpvCommandExecutor {
     }
 
     fun nextSurfaceGeneration(): Int = surfaceGeneration.incrementAndGet()
+    fun isCurrentSurfaceGeneration(gen: Int): Boolean = surfaceGeneration.get() == gen
 
     fun detachSurface() {
-        val capturedGen = surfaceGeneration.get()
+        val capturedGen = surfaceGeneration.incrementAndGet()
         execute {
             if (surfaceGeneration.get() == capturedGen) {
                 Log.d(TAG, "detachSurface gen=$capturedGen")
-                MPVLib.detachSurface()
+                runCatching { MPVLib.setPropertyString("vo", "null") }
+                runCatching { MPVLib.setPropertyString("force-window", "no") }
+                runCatching { MPVLib.detachSurface() }
             } else {
                 Log.d(TAG, "detachSurface skipped — stale gen=$capturedGen")
             }

@@ -34,16 +34,16 @@ class MpvSurface(private val executor: MpvCommandExecutor) : SurfaceHolder.Callb
         }
     }
 
-    override fun surfaceDestroyed(holder: SurfaceHolder) {
-        Log.d(TAG, "surfaceDestroyed")
+    fun detachAndDisableVo() {
+        Log.d(TAG, "detachAndDisableVo")
         attachedSurface = null
         pendingAttachSurface.set(null)
-        // Disable VO before detach — prevents MPV rendering to a dead surface
-        executor.execute {
-            runCatching { MPVLib.setPropertyString("vo", "null") }
-            runCatching { MPVLib.setPropertyString("force-window", "no") }
-        }
         executor.detachSurface()
+    }
+
+    override fun surfaceDestroyed(holder: SurfaceHolder) {
+        Log.d(TAG, "surfaceDestroyed")
+        detachAndDisableVo()
     }
 
     private fun attachSurfaceInternal(surface: Surface?) {
@@ -53,12 +53,16 @@ class MpvSurface(private val executor: MpvCommandExecutor) : SurfaceHolder.Callb
         val gen      = executor.nextSurfaceGeneration()
         val callback = surfaceReadyCallback
         executor.execute {
-            Log.d(TAG, "attachSurface gen=$gen")
-            runCatching { MPVLib.attachSurface(surface) }
-            runCatching { MPVLib.setOptionString("force-window", "yes") }
-            runCatching { MPVLib.setPropertyString("vo", "gpu") }
-            pendingAttachSurface.set(null)
-            mainHandler.post { callback?.invoke() }
+            if (executor.isCurrentSurfaceGeneration(gen)) {
+                Log.d(TAG, "attachSurface gen=$gen")
+                runCatching { MPVLib.attachSurface(surface) }
+                runCatching { MPVLib.setOptionString("force-window", "yes") }
+                runCatching { MPVLib.setPropertyString("vo", "gpu") }
+                pendingAttachSurface.set(null)
+                mainHandler.post { callback?.invoke() }
+            } else {
+                Log.d(TAG, "attachSurface skipped — stale gen=$gen")
+            }
         }
     }
 

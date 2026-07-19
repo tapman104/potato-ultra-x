@@ -197,6 +197,7 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
 
     override fun onCleared() {
         super.onCleared()
+        repository.enterStandby()
         repository.cleanup()
     }
 }

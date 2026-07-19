@@ -8,6 +8,7 @@ composeBom          = "2024.12.01"
 navigationCompose   = "2.8.5"
 lifecycleViewModel  = "2.8.7"
 appcompat           = "1.7.0"
+kotlinxSerializationJson = "1.7.3"
 
 [libraries]
 androidx-appcompat             = { group = "androidx.appcompat",        name = "appcompat",                   version.ref = "appcompat" }
@@ -24,8 +25,10 @@ androidx-ui-tooling            = { group = "androidx.compose.ui",       name = "
 androidx-navigation-compose    = { group = "androidx.navigation",       name = "navigation-compose",          version.ref = "navigationCompose" }
 androidx-lifecycle-viewmodel   = { group = "androidx.lifecycle",        name = "lifecycle-viewmodel-ktx",     version.ref = "lifecycleViewModel" }
 androidx-lifecycle-runtime-compose = { group = "androidx.lifecycle",   name = "lifecycle-runtime-compose",   version.ref = "lifecycleViewModel" }
+kotlinx-serialization-json         = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json",  version.ref = "kotlinxSerializationJson" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android      = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose      = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

@@ -54,6 +54,16 @@ class MpvEngine(private val context: Context) {
         }
     }
 
+    fun enterStandby() {
+        Log.d(TAG, "enterStandby")
+        surface.setSurfaceReadyCallback(null)
+        surface.detachAndDisableVo()
+        executor.execute {
+            runCatching { MPVLib.command("stop") }
+            runCatching { MPVLib.setPropertyString("vo", "null") }
+        }
+    }
+
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     fun destroy() {
         if (!initialized.compareAndSet(true, false)) return

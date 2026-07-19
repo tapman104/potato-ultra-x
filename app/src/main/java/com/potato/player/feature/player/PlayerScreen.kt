@@ -43,8 +43,9 @@ import kotlinx.coroutines.delay
 @Composable
 fun PlayerScreen(
     encodedUri: String,
+    title: String = "",
     viewModel: PlayerViewModel,
-    navController: NavController,
+    onBack: () -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -64,9 +65,9 @@ fun PlayerScreen(
         }
     }
 
-    // Derive accurate display name (checking OpenableColumns for content URIs or clean path segment)
-    val fileName = remember(encodedUri, context) {
-        resolveFileName(context, encodedUri)
+    // Derive accurate display name or use provided title
+    val fileName = remember(encodedUri, title, context) {
+        if (title.isNotBlank()) title else resolveFileName(context, encodedUri)
     }
 
     var controlsVisible by remember { mutableStateOf(true) }
@@ -215,7 +216,7 @@ fun PlayerScreen(
                 PlayerTopBar(
                     fileName              = fileName,
                     currentDecoder        = uiState.hwdecCurrent,
-                    onBack                = { navController.popBackStack() },
+                    onBack                = onBack,
                     onSelectAudioTrack    = { viewModel.onShowAudioDialog() },
                     onSelectSubtitleTrack = { viewModel.onShowSubtitleDialog() },
                     onSelectDecoder       = { showDecoderDialog = true },
