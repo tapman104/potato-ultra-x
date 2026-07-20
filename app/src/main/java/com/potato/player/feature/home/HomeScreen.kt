@@ -15,8 +15,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.content.pm.ActivityInfo
 import com.potato.player.util.MediaMetadataRepository
 import com.potato.player.util.findActivity
+import com.potato.player.util.lockOrientation
 
 @Composable
 fun HomeScreen(
@@ -30,11 +32,11 @@ fun HomeScreen(
     DisposableEffect(lifecycleOwner, activity) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.lockToPortrait(activity)
+                lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        viewModel.lockToPortrait(activity)
+        lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
         }

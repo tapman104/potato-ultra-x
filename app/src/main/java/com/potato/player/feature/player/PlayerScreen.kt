@@ -37,7 +37,9 @@ import com.potato.player.feature.player.controls.PlayerBottomControls
 import com.potato.player.feature.player.controls.PlayerDecoderDialog
 import com.potato.player.feature.player.controls.PlayerTopBar
 import com.potato.player.feature.player.controls.SubtitleTrackDialog
+import android.content.pm.ActivityInfo
 import com.potato.player.util.findActivity
+import com.potato.player.util.lockOrientation
 import kotlinx.coroutines.delay
 
 @Composable
@@ -55,11 +57,11 @@ fun PlayerScreen(
     DisposableEffect(lifecycleOwner, activity) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                viewModel.lockToLandscape(activity)
+                lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        viewModel.lockToLandscape(activity)
+        lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
