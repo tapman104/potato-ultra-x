@@ -28,15 +28,11 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
-import com.potato.player.feature.player.controls.AudioTrackDialog
 import com.potato.player.feature.player.controls.DoubleTapSeekOverlay
 import com.potato.player.feature.player.controls.DoubleTapSeekState
 import com.potato.player.feature.player.controls.HoldToFastForward
-import com.potato.player.feature.player.controls.PlayerRightSideSheet
 import com.potato.player.feature.player.controls.PlayerBottomControls
-import com.potato.player.feature.player.controls.PlayerDecoderDialog
 import com.potato.player.feature.player.controls.PlayerTopBar
-import com.potato.player.feature.player.controls.SubtitleTrackDialog
 import android.content.pm.ActivityInfo
 import com.potato.player.util.findActivity
 import com.potato.player.util.lockOrientation
@@ -252,44 +248,12 @@ fun PlayerScreen(
             }
         }
 
-        // ── Decoder Selection Dialog ─────────────────────────────────────────
-        if (showDecoderDialog) {
-            PlayerDecoderDialog(
-                currentDecoder = uiState.hwdecCurrent,
-                onSelectDecoder = { mode -> viewModel.setDecoder(mode) },
-                onDismiss = { showDecoderDialog = false }
-            )
-        }
-
-        if (uiState.showAudioDialog) {
-            AudioTrackDialog(
-                tracks = uiState.tracks.filter { it.type == "audio" },
-                currentTrackId = uiState.currentAudioTrackId,
-                onSelectTrack = { viewModel.onSelectAudioTrack(it) },
-                onDismiss = { viewModel.onDismissAudioDialog() }
-            )
-        }
-
-        if (uiState.showSubtitleDialog) {
-            SubtitleTrackDialog(
-                tracks = uiState.tracks.filter { it.type == "sub" },
-                currentTrackId = uiState.currentSubtitleTrackId,
-                onSelectTrack = { viewModel.onSelectSubtitleTrack(it) },
-                onLoadExternal = { uri -> viewModel.onLoadExternalSubtitle(uri, context) },
-                onDismiss = { viewModel.onDismissSubtitleDialog() }
-            )
-        }
-
-        PlayerRightSideSheet(
-            visible = uiState.showMoreMenu || uiState.showSpeedDialog,
-            currentSpeed = uiState.playbackSpeed,
-            onSelectSpeed = { viewModel.setPlaybackSpeed(it) },
-            onShowAudioDialog = { viewModel.onShowAudioDialog() },
-            onShowSubtitleDialog = { viewModel.onShowSubtitleDialog() },
-            onDismiss = {
-                viewModel.onMoreMenuDismiss()
-                viewModel.onDismissSpeedDialog()
-            }
+        // ponytail: move only, zero new logic
+        PlayerModals(
+            uiState = uiState,
+            viewModel = viewModel,
+            showDecoderDialog = showDecoderDialog,
+            onDismissDecoderDialog = { showDecoderDialog = false }
         )
     }
 }
