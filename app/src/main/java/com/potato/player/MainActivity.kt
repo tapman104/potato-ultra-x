@@ -39,6 +39,7 @@ private val AmoledDarkColorScheme = darkColorScheme(
 class MainActivity : ComponentActivity() {
     private var pendingIntent by mutableStateOf<Intent?>(null)
     private var mpvEngine: MpvEngine? = null
+    private var playerRepository: PlayerRepository? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,6 +53,10 @@ class MainActivity : ComponentActivity() {
         // Immersive full-screen
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
+        addOnPictureInPictureModeChangedListener { info ->
+            handlePipModeChange(info.isInPictureInPictureMode)
+        }
+
         setContent {
             MaterialTheme(colorScheme = AmoledDarkColorScheme) {
                 val navController = rememberNavController()
@@ -60,6 +65,7 @@ class MainActivity : ComponentActivity() {
                 val engine = remember { MpvEngine(applicationContext) }
                 val repository = remember { PlayerRepository(engine) }
                 mpvEngine = engine
+                playerRepository = repository
 
                 DisposableEffect(Unit) {
                     engine.init()
@@ -140,6 +146,23 @@ class MainActivity : ComponentActivity() {
         // Don't pause playback when transitioning into PiP mode
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && isInPictureInPictureMode) return
         mpvEngine?.executor?.pause()
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        handlePipModeChange(isInPictureInPictureMode)
+    }
+
+    private fun handlePipModeChange(isInPip: Boolean) {
+        playerRepository?.setPipMode(isInPip)
+        mpvEngine?.let { engine ->
+            if (isInPip) {
+                engine.executor.play()
+                engine.surface.reattachSurface()
+            } else {
+                engine.surface.reattachSurface()
+            }
+        }
     }
 
     override fun onDestroy() {

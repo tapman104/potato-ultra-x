@@ -40,6 +40,7 @@ class MpvSurface(private val executor: MpvCommandExecutor) : SurfaceHolder.Callb
                 if (size.isNotEmpty()) {
                     runCatching { MPVLib.setOptionString("android-surface-size", size) }
                 }
+                runCatching { MPVLib.setOptionString("force-window", "yes") }
                 runCatching { MPVLib.setPropertyString("vo", "gpu") }
                 pendingAttachSurface.set(null)
             }
@@ -58,6 +59,7 @@ class MpvSurface(private val executor: MpvCommandExecutor) : SurfaceHolder.Callb
             executor.execute {
                 if (!executor.isAlive()) return@execute
                 runCatching { MPVLib.setPropertyString("android-surface-size", size) }
+                runCatching { MPVLib.setOptionString("force-window", "yes") }
                 runCatching { MPVLib.setPropertyString("vo", "gpu") }
             }
         }

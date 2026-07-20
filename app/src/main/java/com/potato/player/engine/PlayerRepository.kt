@@ -30,6 +30,7 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
     private val _subPos = MutableStateFlow(100); val subPos: StateFlow<Int> = _subPos.asStateFlow()
     private val _videoWidth = MutableStateFlow(0); val videoWidth: StateFlow<Int> = _videoWidth.asStateFlow()
     private val _videoHeight = MutableStateFlow(0); val videoHeight: StateFlow<Int> = _videoHeight.asStateFlow()
+    private val _isInPipMode = MutableStateFlow(false); val isInPipMode: StateFlow<Boolean> = _isInPipMode.asStateFlow()
 
     private val _isFastForwarding = MutableStateFlow(false)
     val isFastForwarding: StateFlow<Boolean> = _isFastForwarding.asStateFlow()
@@ -106,6 +107,7 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
     fun togglePlay() { engine.executor.togglePlay() }
     fun play()       { engine.executor.play() }
     fun pause()      { engine.executor.pause() }
+    fun setPipMode(isInPip: Boolean) { _isInPipMode.value = isInPip }
     fun seekGesture(sec: Double) { engine.executor.seekGesture(sec) }
 
     fun seekCommit(sec: Double) {
@@ -219,7 +221,7 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
         // MPV property event on next load. Resetting caused a stale "HW+" badge flash.
         _tracks.value = emptyList(); _currentAudioTrackId.value = -1; _currentSubtitleTrackId.value = -1
         _subScale.value = 1.0; _subPos.value = 100; _isFastForwarding.value = false
-        _videoWidth.value = 0; _videoHeight.value = 0
+        _videoWidth.value = 0; _videoHeight.value = 0; _isInPipMode.value = false
         isSliderSeeking = false; lastTimePosUpdate = 0L
         currentUri = ""
         currentTitle = ""

@@ -100,6 +100,60 @@ fun PlayerBottomControls(
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
     ) {
+        // Play/Pause centered, and Auto-Rotation + PiP right-aligned above the seek area
+        val onToggleAutoRotationRef = rememberUpdatedState(onToggleAutoRotation)
+        val onEnterPipRef           = rememberUpdatedState(onEnterPip)
+        val handleToggleAutoRotation = remember { { onToggleAutoRotationRef.value() } }
+        val handleEnterPip           = remember { { onEnterPipRef.value() } }
+        val buttonModifier = PlayerControlsStyles.iconButtonModifier
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // Play / Pause — white circle, black icon
+            IconButton(
+                onClick  = onTogglePlay,
+                modifier = Modifier
+                    .size(64.dp)
+                    .background(Color.White, shape = CircleShape)
+            ) {
+                Icon(
+                    imageVector     = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = if (isPlaying) "Pause" else "Play",
+                    tint            = Color.Black,
+                    modifier        = Modifier.size(36.dp)
+                )
+            }
+
+            // Auto-Rotation + PiP — bottom-right corner
+            Row(
+                modifier              = Modifier.align(Alignment.CenterEnd),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = handleToggleAutoRotation, modifier = buttonModifier) {
+                    Icon(
+                        imageVector        = if (isAutoRotation) Icons.Default.ScreenRotation else Icons.Default.ScreenLockLandscape,
+                        contentDescription = if (isAutoRotation) "Auto-rotation on" else "Rotation locked",
+                        tint               = if (isAutoRotation) Color(0xFF90CAF9) else Color.White
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    IconButton(onClick = handleEnterPip, modifier = buttonModifier) {
+                        Icon(
+                            imageVector        = Icons.Default.PictureInPicture,
+                            contentDescription = "Picture-in-Picture",
+                            tint               = Color.White
+                        )
+                    }
+                }
+            }
+        }
+
         // Time row: current position left, total duration right
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -169,7 +223,7 @@ fun PlayerBottomControls(
             }
         }
 
-        // Seek bar with custom background track and visual buffer indicator track
+        // Seek bar flush at bottom edge with custom background track and visual buffer indicator track
         BoxWithConstraints(
             modifier = Modifier.fillMaxWidth(),
             contentAlignment = Alignment.Center
@@ -203,59 +257,6 @@ fun PlayerBottomControls(
                 colors                = sliderColors,
                 modifier              = Modifier.fillMaxWidth()
             )
-        }
-
-        // Play / Pause — white circle, black icon
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier         = Modifier.fillMaxWidth()
-        ) {
-            IconButton(
-                onClick  = onTogglePlay,
-                modifier = Modifier
-                    .size(64.dp)
-                    .background(Color.White, shape = CircleShape)
-            ) {
-                Icon(
-                    imageVector     = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (isPlaying) "Pause" else "Play",
-                    tint            = Color.Black,
-                    modifier        = Modifier.size(36.dp)
-                )
-            }
-        }
-
-        // ── Auto-Rotation + PiP — bottom-right corner ────────────────────────
-        val onToggleAutoRotationRef = rememberUpdatedState(onToggleAutoRotation)
-        val onEnterPipRef           = rememberUpdatedState(onEnterPip)
-        val handleToggleAutoRotation = remember { { onToggleAutoRotationRef.value() } }
-        val handleEnterPip           = remember { { onEnterPipRef.value() } }
-        val buttonModifier = PlayerControlsStyles.iconButtonModifier
-
-        Row(
-            modifier              = Modifier
-                .fillMaxWidth()
-                .padding(top = 4.dp),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment     = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = handleToggleAutoRotation, modifier = buttonModifier) {
-                Icon(
-                    imageVector        = if (isAutoRotation) Icons.Default.ScreenRotation else Icons.Default.ScreenLockLandscape,
-                    contentDescription = if (isAutoRotation) "Auto-rotation on" else "Rotation locked",
-                    tint               = if (isAutoRotation) Color(0xFF90CAF9) else Color.White
-                )
-            }
-            Spacer(modifier = Modifier.width(8.dp))
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                IconButton(onClick = handleEnterPip, modifier = buttonModifier) {
-                    Icon(
-                        imageVector        = Icons.Default.PictureInPicture,
-                        contentDescription = "Picture-in-Picture",
-                        tint               = Color.White
-                    )
-                }
-            }
         }
     }
 }

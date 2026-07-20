@@ -72,6 +72,12 @@ fun PlayerScreen(
         }
     }
 
+    LaunchedEffect(uiState.isInPipMode) {
+        if (uiState.isInPipMode) {
+            controlsVisible = false
+        }
+    }
+
     // Clear double-tap seek overlay after animation
     LaunchedEffect(doubleTapSeekState?.triggerId) {
         if (doubleTapSeekState != null) {
@@ -119,7 +125,8 @@ fun PlayerScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(Unit) {
+                .pointerInput(uiState.isInPipMode) {
+                    if (uiState.isInPipMode) return@pointerInput
                     detectTapGestures(
                         onPress = { offset ->
                             tryAwaitRelease()
@@ -154,7 +161,8 @@ fun PlayerScreen(
                         }
                     )
                 }
-                .pointerInput(Unit) {
+                .pointerInput(uiState.isInPipMode) {
+                    if (uiState.isInPipMode) return@pointerInput
                     awaitEachGesture {
                         awaitFirstDown(requireUnconsumed = false)
                         do {
@@ -169,15 +177,19 @@ fun PlayerScreen(
         )
 
         // ── Double-Tap Seek Overlay Ripple ───────────────────────────────────
-        DoubleTapSeekOverlay(seekState = doubleTapSeekState)
+        if (!uiState.isInPipMode) {
+            DoubleTapSeekOverlay(seekState = doubleTapSeekState)
+        }
 
         // ── Top Hold for 2x Fast-Forward Banner ──────────────────────────────
-        HoldToFastForward(
-            visible = uiState.isFastForwarding || isLongPressActive,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = if (controlsVisible) 72.dp else 36.dp)
-        )
+        if (!uiState.isInPipMode) {
+            HoldToFastForward(
+                visible = uiState.isFastForwarding || isLongPressActive,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = if (controlsVisible) 72.dp else 36.dp)
+            )
+        }
 
         // ── Loading indicator ────────────────────────────────────────────────
         if (uiState.isLoading) {
@@ -196,7 +208,7 @@ fun PlayerScreen(
             )
         }
 
-        if (uiState.fileLoaded) {
+        if (uiState.fileLoaded && !uiState.isInPipMode) {
 
             // ── Top bar ──────────────────────────────────────────────────────
             AnimatedVisibility(
@@ -210,12 +222,10 @@ fun PlayerScreen(
                 PlayerTopBar(
                     fileName              = fileName,
                     currentDecoder        = uiState.hwdecCurrent,
-                    orientationMode       = uiState.orientationMode,
                     onBack                = onBack,
                     onSelectAudioTrack    = { viewModel.onShowAudioDialog() },
                     onSelectSubtitleTrack = { viewModel.onShowSubtitleDialog() },
                     onSelectDecoder       = { viewModel.onShowDecoderDialog() },
-                    onToggleOrientation   = { viewModel.cycleOrientationMode() },
                     onMoreOptions         = { viewModel.onMoreMenuToggle() }
                 )
             }
@@ -256,10 +266,12 @@ fun PlayerScreen(
         }
 
         // ponytail: move only, zero new logic
-        PlayerModals(
-            uiState = uiState,
-            viewModel = viewModel
-        )
+        if (!uiState.isInPipMode) {
+            PlayerModals(
+                uiState = uiState,
+                viewModel = viewModel
+            )
+        }
     }
 }
 

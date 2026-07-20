@@ -46,7 +46,8 @@ data class PlayerUiState(
     val videoWidth: Int = 0,
     val videoHeight: Int = 0,
     val orientationMode: OrientationMode = OrientationMode.AUTO,
-    val isAutoRotation: Boolean = false
+    val isAutoRotation: Boolean = false,
+    val isInPipMode: Boolean = false
 )
 
 class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
@@ -63,6 +64,7 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
         viewModelScope.launch { prefsRepository.subScaleFlow.collect { repository.setSubScale(it) } }
         viewModelScope.launch { prefsRepository.subPosFlow.collect { repository.setSubPos(it) } }
         viewModelScope.launch { prefsRepository.autoRotationFlow.collect { v -> _uiState.update { it.copy(isAutoRotation = v) } } }
+        viewModelScope.launch { repository.isInPipMode.collect { v -> _uiState.update { it.copy(isInPipMode = v) } } }
         viewModelScope.launch {
             repository.initResult.collect { result ->
                 if (result.isSuccess) {
