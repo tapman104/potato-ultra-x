@@ -142,7 +142,12 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
         }
     }
 
-    fun setDecoder(hwdec: String) { engine.prepareDecoderSwitch { engine.executor.setDecoder(hwdec) } }
+    fun setDecoder(hwdec: String) {
+        engine.prepareDecoderSwitch {
+            engine.executor.setDecoder(hwdec)
+            _hwdecCurrent.value = when (hwdec) { "no" -> "SW"; "mediacodec" -> "HW"; else -> "HW+" }
+        }
+    }
 
     fun setPlaybackSpeed(speed: Double) {
         val clamped = speed.coerceIn(0.25, 4.0)
