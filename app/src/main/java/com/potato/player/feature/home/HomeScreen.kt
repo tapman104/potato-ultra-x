@@ -14,7 +14,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.viewmodel.compose.viewModel
 import android.content.pm.ActivityInfo
 import com.potato.player.util.MediaMetadataRepository
 import com.potato.player.util.findActivity
@@ -22,8 +21,7 @@ import com.potato.player.util.lockOrientation
 
 @Composable
 fun HomeScreen(
-    onNavigateToPlayer: (videoUri: String, title: String) -> Unit,
-    viewModel: HomeViewModel = viewModel()
+    onNavigateToPlayer: (videoUri: String, title: String) -> Unit
 ) {
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
@@ -47,7 +45,6 @@ fun HomeScreen(
     LaunchedEffect(pendingUri) {
         pendingUri?.let { uri ->
             val uriStr = uri.toString()
-            viewModel.onVideoPicked(uriStr)
             val title = MediaMetadataRepository.resolveTitle(context, uri)
             onNavigateToPlayer(uriStr, title)
             pendingUri = null
