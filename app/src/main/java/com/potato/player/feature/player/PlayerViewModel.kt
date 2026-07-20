@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.potato.player.data.UserPreferencesRepository
 import com.potato.player.engine.MpvSurface
 import com.potato.player.engine.PlayerRepository
 import com.potato.player.engine.TrackInfo
@@ -39,6 +40,8 @@ data class PlayerUiState(
 
 class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
 
+    private val prefsRepository by lazy { UserPreferencesRepository(repository.engine.context) }
+
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState
 
@@ -46,6 +49,8 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
     val surface: MpvSurface get() = repository.engine.surface
 
     init {
+        viewModelScope.launch { prefsRepository.subScaleFlow.collect { repository.setSubScale(it) } }
+        viewModelScope.launch { prefsRepository.subPosFlow.collect { repository.setSubPos(it) } }
         viewModelScope.launch {
             repository.initResult.collect { result ->
                 if (result.isSuccess) {
@@ -184,11 +189,19 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
     fun setSubtitleAppearance(scale: Double, pos: Int) {
         repository.setSubScale(scale)
         repository.setSubPos(pos)
+        viewModelScope.launch {
+            prefsRepository.setSubScale(scale)
+            prefsRepository.setSubPos(pos)
+        }
     }
 
     fun resetSubtitleAppearance() {
         repository.setSubScale(1.0)
         repository.setSubPos(100)
+        viewModelScope.launch {
+            prefsRepository.setSubScale(1.0)
+            prefsRepository.setSubPos(100)
+        }
     }
 
     override fun onCleared() {
