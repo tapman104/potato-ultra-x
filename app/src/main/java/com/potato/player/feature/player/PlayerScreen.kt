@@ -144,17 +144,18 @@ fun PlayerScreen(
                             viewModel.startFastForward()
                         },
                         onDoubleTap = { offset ->
+                            val current = doubleTapSeekState // ponytail: one snapshot variable eliminates the crash
                             val screenWidth = size.width
                             if (offset.x < screenWidth / 2f) {
                                 viewModel.seekExactRelative(-10)
-                                val accum = if (doubleTapSeekState != null && !doubleTapSeekState!!.isForward) {
-                                    doubleTapSeekState!!.totalSeconds + 10
+                                val accum = if (current != null && !current.isForward) {
+                                    current.totalSeconds + 10
                                 } else 10
                                 doubleTapSeekState = DoubleTapSeekState(isForward = false, totalSeconds = accum)
                             } else {
                                 viewModel.seekExactRelative(10)
-                                val accum = if (doubleTapSeekState != null && doubleTapSeekState!!.isForward) {
-                                    doubleTapSeekState!!.totalSeconds + 10
+                                val accum = if (current != null && current.isForward) {
+                                    current.totalSeconds + 10
                                 } else 10
                                 doubleTapSeekState = DoubleTapSeekState(isForward = true, totalSeconds = accum)
                             }
