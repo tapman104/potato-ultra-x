@@ -60,10 +60,6 @@ fun AppNavigation(
         startDestination = HomeRoute
     ) {
         composable<HomeRoute> {
-            DisposableEffect(Unit) {
-                repository.enterStandby()
-                onDispose { }
-            }
             HomeScreen(
                 onNavigateToPlayer = { uri, title ->
                     navController.navigate(PlayerRoute(videoUri = uri, title = title))
@@ -75,7 +71,7 @@ fun AppNavigation(
             val route: PlayerRoute = backStackEntry.toRoute()
             val activity = LocalContext.current.findActivity()
 
-            DisposableEffect(Unit) {
+            DisposableEffect(route.videoUri) {
                 onDispose {
                     repository.enterStandby()
                 }

@@ -3,7 +3,9 @@ package com.potato.player.feature.player.controls
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -64,6 +66,7 @@ fun PlayerDecoderDialog(
                     .fillMaxWidth()
                     .padding(20.dp)
             ) {
+                // Header — never scrolls
                 Text(
                     text = "Select Video Decoder",
                     color = Color.White,
@@ -79,57 +82,64 @@ fun PlayerDecoderDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                decoderOptions.forEach { option ->
-                    val isSelected = currentDecoder == option.badge
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(
-                                if (isSelected) Color.White.copy(alpha = 0.15f)
-                                else Color.Transparent
+                // Options list — scrollable but no scrollbar shown
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 320.dp)          // caps height on small screens
+                        .verticalScroll(rememberScrollState()) // hidden scrollbar by default
+                ) {
+                    decoderOptions.forEach { option ->
+                        val isSelected = currentDecoder == option.badge
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(
+                                    if (isSelected) Color.White.copy(alpha = 0.15f)
+                                    else Color.Transparent
+                                )
+                                .clickable {
+                                    onSelectDecoder(option.mpvValue)
+                                    onDismiss()
+                                }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = isSelected,
+                                onClick = {
+                                    onSelectDecoder(option.mpvValue)
+                                    onDismiss()
+                                },
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = Color.White,
+                                    unselectedColor = Color.White.copy(alpha = 0.5f)
+                                )
                             )
-                            .clickable {
-                                onSelectDecoder(option.mpvValue)
-                                onDismiss()
-                            }
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = isSelected,
-                            onClick = {
-                                onSelectDecoder(option.mpvValue)
-                                onDismiss()
-                            },
-                            colors = RadioButtonDefaults.colors(
-                                selectedColor = Color.White,
-                                unselectedColor = Color.White.copy(alpha = 0.5f)
-                            )
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = option.title,
                                     color = Color.White,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                     fontSize = 15.sp
                                 )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = option.description,
+                                    color = Color.White.copy(alpha = 0.65f),
+                                    fontSize = 12.sp
+                                )
                             }
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = option.description,
-                                color = Color.White.copy(alpha = 0.65f),
-                                fontSize = 12.sp
-                            )
                         }
+                        Spacer(modifier = Modifier.height(6.dp))
                     }
-                    Spacer(modifier = Modifier.height(6.dp))
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
 
+                // Footer — never scrolls
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
