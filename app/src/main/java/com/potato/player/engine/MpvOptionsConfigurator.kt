@@ -91,6 +91,8 @@ class MpvOptionsConfigurator {
         MPVLib.observeProperty(MpvProp.HWDEC_CURRENT,      MpvFmt.STRING)
         MPVLib.observeProperty(MpvProp.SUB_SCALE,          MpvFmt.DOUBLE)
         MPVLib.observeProperty(MpvProp.SUB_POS,            MpvFmt.INT64)
+        MPVLib.observeProperty(MpvProp.VIDEO_PARAMS_W,     MpvFmt.INT64)
+        MPVLib.observeProperty(MpvProp.VIDEO_PARAMS_H,     MpvFmt.INT64)
     }
 
     companion object { private const val TAG = "MpvOptionsConfigurator" }

@@ -4,6 +4,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.ScreenLockLandscape
+import androidx.compose.material.icons.filled.ScreenLockPortrait
+import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material.icons.filled.Subtitles
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -15,28 +18,39 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.potato.player.feature.player.OrientationMode
 
 @Composable
 fun PlayerQuickActions(
     currentDecoder: String,
+    orientationMode: OrientationMode,
     onSelectAudioTrack: () -> Unit,
     onSelectSubtitleTrack: () -> Unit,
     onSelectDecoder: () -> Unit,
+    onToggleOrientation: () -> Unit,
     onMoreOptions: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val buttonModifier = PlayerControlsStyles.iconButtonModifier
 
     // rememberUpdatedState so lambdas stable-wrapped in remember{} always call latest
-    val onAudioRef    = rememberUpdatedState(onSelectAudioTrack)
-    val onSubtitleRef = rememberUpdatedState(onSelectSubtitleTrack)
-    val onDecoderRef  = rememberUpdatedState(onSelectDecoder)
-    val onMoreRef     = rememberUpdatedState(onMoreOptions)
+    val onAudioRef       = rememberUpdatedState(onSelectAudioTrack)
+    val onSubtitleRef    = rememberUpdatedState(onSelectSubtitleTrack)
+    val onDecoderRef     = rememberUpdatedState(onSelectDecoder)
+    val onOrientationRef = rememberUpdatedState(onToggleOrientation)
+    val onMoreRef        = rememberUpdatedState(onMoreOptions)
 
-    val handleAudio    = remember { { onAudioRef.value()    } }
-    val handleSubtitle = remember { { onSubtitleRef.value() } }
-    val handleDecoder  = remember { { onDecoderRef.value()  } }
-    val handleMore     = remember { { onMoreRef.value()     } }
+    val handleAudio       = remember { { onAudioRef.value()       } }
+    val handleSubtitle    = remember { { onSubtitleRef.value()    } }
+    val handleDecoder     = remember { { onDecoderRef.value()     } }
+    val handleOrientation = remember { { onOrientationRef.value() } }
+    val handleMore        = remember { { onMoreRef.value()        } }
+
+    val orientationIcon = when (orientationMode) {
+        OrientationMode.AUTO -> Icons.Default.ScreenRotation
+        OrientationMode.LOCK_LANDSCAPE -> Icons.Default.ScreenLockLandscape
+        OrientationMode.LOCK_PORTRAIT -> Icons.Default.ScreenLockPortrait
+    }
 
     Row(
         modifier              = modifier,
@@ -55,6 +69,13 @@ fun PlayerQuickActions(
                 color = Color.White,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold
+            )
+        }
+        IconButton(onClick = handleOrientation, modifier = buttonModifier) {
+            Icon(
+                imageVector = orientationIcon,
+                contentDescription = "Orientation: ${orientationMode.label}",
+                tint = Color.White
             )
         }
         IconButton(onClick = handleMore, modifier = buttonModifier) {

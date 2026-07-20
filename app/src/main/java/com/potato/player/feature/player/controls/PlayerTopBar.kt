@@ -11,15 +11,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.potato.player.feature.player.OrientationMode
 
 @Composable
 fun PlayerTopBar(
     fileName: String,
     currentDecoder: String,
+    orientationMode: OrientationMode,
     onBack: () -> Unit,
     onSelectAudioTrack: () -> Unit,
     onSelectSubtitleTrack: () -> Unit,
     onSelectDecoder: () -> Unit,
+    onToggleOrientation: () -> Unit,
     onMoreOptions: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -56,12 +59,14 @@ fun PlayerTopBar(
                 .weight(1f)
         )
 
-        // Audio / Subtitle / Decoder / More icons
+        // Audio / Subtitle / Decoder / Orientation / More icons
         PlayerQuickActions(
             currentDecoder        = currentDecoder,
+            orientationMode       = orientationMode,
             onSelectAudioTrack    = onSelectAudioTrack,
             onSelectSubtitleTrack = onSelectSubtitleTrack,
             onSelectDecoder       = onSelectDecoder,
+            onToggleOrientation   = onToggleOrientation,
             onMoreOptions         = onMoreOptions
         )
     }

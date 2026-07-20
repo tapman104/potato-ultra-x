@@ -14,6 +14,8 @@ internal object MpvProp {
     const val SID                = "sid"
     const val SUB_SCALE          = "sub-scale"
     const val SUB_POS            = "sub-pos"
+    const val VIDEO_PARAMS_W     = "video-params/w"
+    const val VIDEO_PARAMS_H     = "video-params/h"
 }
 
 internal object MpvFmt {

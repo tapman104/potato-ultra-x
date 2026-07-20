@@ -48,7 +48,7 @@ fun PlayerScreen(
     val activity = remember(context) { context.findActivity() }
 
     // ponytail: orientation + insets boilerplate extracted for readability
-    PlayerLifecycleEffect(activity = activity)
+    PlayerLifecycleEffect(activity = activity, uiState = uiState)
 
     // Derive accurate display name or use provided title
     var fileName by remember(videoUri, title) { mutableStateOf(if (title.isNotBlank()) title else "Video") }
@@ -208,10 +208,12 @@ fun PlayerScreen(
                 PlayerTopBar(
                     fileName              = fileName,
                     currentDecoder        = uiState.hwdecCurrent,
+                    orientationMode       = uiState.orientationMode,
                     onBack                = onBack,
                     onSelectAudioTrack    = { viewModel.onShowAudioDialog() },
                     onSelectSubtitleTrack = { viewModel.onShowSubtitleDialog() },
                     onSelectDecoder       = { viewModel.onShowDecoderDialog() },
+                    onToggleOrientation   = { viewModel.cycleOrientationMode() },
                     onMoreOptions         = { viewModel.onMoreMenuToggle() }
                 )
             }
@@ -252,31 +254,40 @@ fun PlayerScreen(
 
 // ponytail: extracted from PlayerScreen — zero new logic
 @Composable
-private fun PlayerLifecycleEffect(activity: android.app.Activity?) {
+private fun PlayerLifecycleEffect(activity: android.app.Activity?, uiState: PlayerUiState) {
     val lifecycleOwner = LocalLifecycleOwner.current
+    var hasSetAspectOrientation by remember { mutableStateOf(false) }
+
     DisposableEffect(lifecycleOwner, activity) {
         val window = activity?.window
         val controller = window?.let { WindowInsetsControllerCompat(it, it.decorView) }
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE)
-                controller?.apply {
-                    hide(WindowInsetsCompat.Type.systemBars())
-                    systemBarsBehavior =
-                        WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                }
+        fun applyInsets() {
+            lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE)
+            controller?.apply {
+                hide(WindowInsetsCompat.Type.systemBars())
+                systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             }
         }
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_RESUME) applyInsets() }
         lifecycleOwner.lifecycle.addObserver(observer)
-        lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE)
-        controller?.apply {
-            hide(WindowInsetsCompat.Type.systemBars())
-            systemBarsBehavior =
-                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        }
+        applyInsets()
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             controller?.show(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+
+    LaunchedEffect(uiState.fileLoaded, uiState.videoWidth, uiState.videoHeight, uiState.orientationMode) {
+        if (!uiState.fileLoaded) return@LaunchedEffect
+        when (uiState.orientationMode) {
+            OrientationMode.LOCK_LANDSCAPE -> { hasSetAspectOrientation = true; lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE) }
+            OrientationMode.LOCK_PORTRAIT -> { hasSetAspectOrientation = true; lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT) }
+            OrientationMode.AUTO -> {
+                if (!hasSetAspectOrientation && uiState.videoWidth > 0 && uiState.videoHeight > 0) {
+                    val target = if (uiState.videoHeight > uiState.videoWidth) ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT else ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                    lockOrientation(activity, target); hasSetAspectOrientation = true
+                } else if (hasSetAspectOrientation) lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_SENSOR)
+            }
         }
     }
 }

@@ -14,39 +14,26 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
 
     val initResult: SharedFlow<Result<Unit>> = engine.initResult
 
-    private val _isPaused    = MutableStateFlow(true)
-    private val _positionSec = MutableStateFlow(0.0)
-    private val _durationSec = MutableStateFlow(0.0)
-    private val _cachedSec   = MutableStateFlow(0.0)
-    private val _cacheDurationSec = MutableStateFlow(0.0)
-    private val _playbackSpeed    = MutableStateFlow(1.0)
-    private val _fileLoaded  = MutableStateFlow(false)
-    private val _isLoading   = MutableStateFlow(false)
-    private val _hwdecCurrent = MutableStateFlow("HW+")
-    private val _tracks              = MutableStateFlow<List<TrackInfo>>(emptyList())
-    private val _currentAudioTrackId    = MutableStateFlow(-1)
-    private val _currentSubtitleTrackId = MutableStateFlow(-1)
-    private val _subScale               = MutableStateFlow(1.0)
-    private val _subPos                 = MutableStateFlow(100)
+    private val _isPaused = MutableStateFlow(true); val isPaused: StateFlow<Boolean> = _isPaused
+    private val _positionSec = MutableStateFlow(0.0); val positionSec: StateFlow<Double> = _positionSec
+    private val _durationSec = MutableStateFlow(0.0); val durationSec: StateFlow<Double> = _durationSec
+    private val _cachedSec = MutableStateFlow(0.0); val cachedSec: StateFlow<Double> = _cachedSec
+    private val _cacheDurationSec = MutableStateFlow(0.0); val cacheDurationSec: StateFlow<Double> = _cacheDurationSec
+    private val _playbackSpeed = MutableStateFlow(1.0); val playbackSpeed: StateFlow<Double> = _playbackSpeed
+    private val _fileLoaded = MutableStateFlow(false); val fileLoaded: StateFlow<Boolean> = _fileLoaded
+    private val _isLoading = MutableStateFlow(false); val isLoading: StateFlow<Boolean> = _isLoading
+    private val _hwdecCurrent = MutableStateFlow("HW+"); val hwdecCurrent: StateFlow<String> = _hwdecCurrent
+    private val _tracks = MutableStateFlow<List<TrackInfo>>(emptyList()); val tracks: StateFlow<List<TrackInfo>> = _tracks.asStateFlow()
+    private val _currentAudioTrackId = MutableStateFlow(-1); val currentAudioTrackId: StateFlow<Int> = _currentAudioTrackId.asStateFlow()
+    private val _currentSubtitleTrackId = MutableStateFlow(-1); val currentSubtitleTrackId: StateFlow<Int> = _currentSubtitleTrackId.asStateFlow()
+    private val _subScale = MutableStateFlow(1.0); val subScale: StateFlow<Double> = _subScale.asStateFlow()
+    private val _subPos = MutableStateFlow(100); val subPos: StateFlow<Int> = _subPos.asStateFlow()
+    private val _videoWidth = MutableStateFlow(0); val videoWidth: StateFlow<Int> = _videoWidth.asStateFlow()
+    private val _videoHeight = MutableStateFlow(0); val videoHeight: StateFlow<Int> = _videoHeight.asStateFlow()
 
     private val _isFastForwarding = MutableStateFlow(false)
     val isFastForwarding: StateFlow<Boolean> = _isFastForwarding.asStateFlow()
     @Volatile private var normalPlaybackSpeed = 1.0
-
-    val isPaused:    StateFlow<Boolean> = _isPaused
-    val positionSec: StateFlow<Double>  = _positionSec
-    val durationSec: StateFlow<Double>  = _durationSec
-    val cachedSec:   StateFlow<Double>  = _cachedSec
-    val cacheDurationSec: StateFlow<Double> = _cacheDurationSec
-    val playbackSpeed: StateFlow<Double>    = _playbackSpeed
-    val fileLoaded:  StateFlow<Boolean> = _fileLoaded
-    val isLoading:   StateFlow<Boolean> = _isLoading
-    val hwdecCurrent: StateFlow<String> = _hwdecCurrent
-    val tracks: StateFlow<List<TrackInfo>>             = _tracks.asStateFlow()
-    val currentAudioTrackId: StateFlow<Int>            = _currentAudioTrackId.asStateFlow()
-    val currentSubtitleTrackId: StateFlow<Int>         = _currentSubtitleTrackId.asStateFlow()
-    val subScale: StateFlow<Double>                    = _subScale.asStateFlow()
-    val subPos: StateFlow<Int>                         = _subPos.asStateFlow()
 
     // Suppress MPV time-pos echo-backs while the slider is being dragged
     @Volatile private var isSliderSeeking  = false
@@ -181,6 +168,8 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
 
     fun loadTracks() {
         engine.executor.execute {
+            _videoWidth.value = engine.executor.getPropertyInt(MpvProp.VIDEO_PARAMS_W) ?: 0
+            _videoHeight.value = engine.executor.getPropertyInt(MpvProp.VIDEO_PARAMS_H) ?: 0
             val count = engine.executor.getPropertyInt(MpvProp.TRACK_LIST_COUNT) ?: 0
             val list = mutableListOf<TrackInfo>()
             for (i in 0 until count) {
@@ -230,6 +219,7 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
         // MPV property event on next load. Resetting caused a stale "HW+" badge flash.
         _tracks.value = emptyList(); _currentAudioTrackId.value = -1; _currentSubtitleTrackId.value = -1
         _subScale.value = 1.0; _subPos.value = 100; _isFastForwarding.value = false
+        _videoWidth.value = 0; _videoHeight.value = 0
         isSliderSeeking = false; lastTimePosUpdate = 0L
         currentUri = ""
         currentTitle = ""
@@ -296,6 +286,8 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
             }
             MpvProp.SUB_SCALE -> ((value as? Number)?.toDouble() ?: (value as? String)?.toDoubleOrNull())?.let { _subScale.value = it }
             MpvProp.SUB_POS -> ((value as? Number)?.toInt() ?: (value as? String)?.toIntOrNull())?.let { _subPos.value = it }
+            MpvProp.VIDEO_PARAMS_W -> ((value as? Number)?.toInt() ?: (value as? String)?.toIntOrNull())?.let { _videoWidth.value = it }
+            MpvProp.VIDEO_PARAMS_H -> ((value as? Number)?.toInt() ?: (value as? String)?.toIntOrNull())?.let { _videoHeight.value = it }
         }
     }
 

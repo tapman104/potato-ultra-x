@@ -2,6 +2,7 @@ package com.potato.player.feature.player
 
 import android.content.Context
 import android.net.Uri
+import android.content.pm.ActivityInfo
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.potato.player.data.UserPreferencesRepository
@@ -16,6 +17,12 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 enum class ActiveSheet { NONE, MORE_MENU, SPEED, AUDIO, SUBTITLE, DECODER }
+
+enum class OrientationMode(val orientation: Int, val label: String) {
+    AUTO(ActivityInfo.SCREEN_ORIENTATION_SENSOR, "AUTO"),
+    LOCK_LANDSCAPE(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE, "LAND"),
+    LOCK_PORTRAIT(ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT, "PORT")
+}
 
 data class PlayerUiState(
     val isPlaying:       Boolean = false,
@@ -35,7 +42,10 @@ data class PlayerUiState(
     val currentSubtitleTrackId: Int = -1,
     val subScale: Double = 1.0,
     val subPos: Int = 100,
-    val activeSheet: ActiveSheet = ActiveSheet.NONE
+    val activeSheet: ActiveSheet = ActiveSheet.NONE,
+    val videoWidth: Int = 0,
+    val videoHeight: Int = 0,
+    val orientationMode: OrientationMode = OrientationMode.AUTO
 )
 
 class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
@@ -76,10 +86,21 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
         viewModelScope.launch { repository.currentSubtitleTrackId.collect { v -> _uiState.update { it.copy(currentSubtitleTrackId = v) } } }
         viewModelScope.launch { repository.subScale.collect { v -> _uiState.update { it.copy(subScale = v) } } }
         viewModelScope.launch { repository.subPos.collect   { v -> _uiState.update { it.copy(subPos = v) } } }
+        viewModelScope.launch { repository.videoWidth.collect  { v -> _uiState.update { it.copy(videoWidth = v) } } }
+        viewModelScope.launch { repository.videoHeight.collect { v -> _uiState.update { it.copy(videoHeight = v) } } }
     }
 
     fun loadFile(uri: String, title: String = "") { repository.loadFile(uri, title) }
     fun togglePlay()           { repository.togglePlay() }
+
+    fun cycleOrientationMode() {
+        val next = when (_uiState.value.orientationMode) {
+            OrientationMode.AUTO -> OrientationMode.LOCK_LANDSCAPE
+            OrientationMode.LOCK_LANDSCAPE -> OrientationMode.LOCK_PORTRAIT
+            OrientationMode.LOCK_PORTRAIT -> OrientationMode.AUTO
+        }
+        _uiState.update { it.copy(orientationMode = next) }
+    }
 
     fun setDecoder(mode: String) {
         repository.setDecoder(mode)
