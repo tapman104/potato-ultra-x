@@ -72,7 +72,6 @@ fun PlayerScreen(
     }
 
     var controlsVisible by remember { mutableStateOf(true) }
-    var showDecoderDialog by remember { mutableStateOf(false) }
     var doubleTapSeekState by remember { mutableStateOf<DoubleTapSeekState?>(null) }
     var isLongPressActive by remember { mutableStateOf(false) }
 
@@ -220,7 +219,7 @@ fun PlayerScreen(
                     onBack                = onBack,
                     onSelectAudioTrack    = { viewModel.onShowAudioDialog() },
                     onSelectSubtitleTrack = { viewModel.onShowSubtitleDialog() },
-                    onSelectDecoder       = { showDecoderDialog = true },
+                    onSelectDecoder       = { viewModel.onShowDecoderDialog() },
                     onMoreOptions         = { viewModel.onMoreMenuToggle() }
                 )
             }
@@ -251,9 +250,7 @@ fun PlayerScreen(
         // ponytail: move only, zero new logic
         PlayerModals(
             uiState = uiState,
-            viewModel = viewModel,
-            showDecoderDialog = showDecoderDialog,
-            onDismissDecoderDialog = { showDecoderDialog = false }
+            viewModel = viewModel
         )
     }
 }

@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+enum class ActiveSheet { NONE, MORE_MENU, SPEED, AUDIO, SUBTITLE, DECODER }
+
 data class PlayerUiState(
     val isPlaying:       Boolean = false,
     val positionSec:     Double  = 0.0,
@@ -32,10 +34,7 @@ data class PlayerUiState(
     val currentSubtitleTrackId: Int = -1,
     val subScale: Double = 1.0,
     val subPos: Int = 100,
-    val showAudioDialog: Boolean = false,
-    val showSubtitleDialog: Boolean = false,
-    val showSpeedDialog: Boolean = false,
-    val showMoreMenu:    Boolean = false
+    val activeSheet: ActiveSheet = ActiveSheet.NONE
 )
 
 class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
@@ -114,35 +113,45 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
     }
 
     fun onMoreMenuToggle() {
-        _uiState.update { it.copy(showMoreMenu = !it.showMoreMenu) }
+        _uiState.update {
+            it.copy(activeSheet = if (it.activeSheet == ActiveSheet.MORE_MENU) ActiveSheet.NONE else ActiveSheet.MORE_MENU)
+        }
     }
 
     fun onMoreMenuDismiss() {
-        _uiState.update { it.copy(showMoreMenu = false) }
+        _uiState.update { it.copy(activeSheet = ActiveSheet.NONE) }
     }
 
     fun onShowAudioDialog() {
-        _uiState.update { it.copy(showAudioDialog = true, showMoreMenu = false) }
+        _uiState.update { it.copy(activeSheet = ActiveSheet.AUDIO) }
     }
 
     fun onDismissAudioDialog() {
-        _uiState.update { it.copy(showAudioDialog = false) }
+        _uiState.update { it.copy(activeSheet = ActiveSheet.NONE) }
     }
 
     fun onShowSubtitleDialog() {
-        _uiState.update { it.copy(showSubtitleDialog = true, showMoreMenu = false) }
+        _uiState.update { it.copy(activeSheet = ActiveSheet.SUBTITLE) }
     }
 
     fun onDismissSubtitleDialog() {
-        _uiState.update { it.copy(showSubtitleDialog = false) }
+        _uiState.update { it.copy(activeSheet = ActiveSheet.NONE) }
     }
 
     fun onShowSpeedDialog() {
-        _uiState.update { it.copy(showSpeedDialog = true, showMoreMenu = false) }
+        _uiState.update { it.copy(activeSheet = ActiveSheet.SPEED) }
     }
 
     fun onDismissSpeedDialog() {
-        _uiState.update { it.copy(showSpeedDialog = false) }
+        _uiState.update { it.copy(activeSheet = ActiveSheet.NONE) }
+    }
+
+    fun onShowDecoderDialog() {
+        _uiState.update { it.copy(activeSheet = ActiveSheet.DECODER) }
+    }
+
+    fun onDismissDecoderDialog() {
+        _uiState.update { it.copy(activeSheet = ActiveSheet.NONE) }
     }
 
     fun setPlaybackSpeed(speed: Double) {
