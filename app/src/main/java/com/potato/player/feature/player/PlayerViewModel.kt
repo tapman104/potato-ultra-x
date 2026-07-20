@@ -4,7 +4,6 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.potato.player.engine.InitResult
 import com.potato.player.engine.MpvSurface
 import com.potato.player.engine.PlayerRepository
 import com.potato.player.engine.TrackInfo
@@ -50,9 +49,11 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
     init {
         viewModelScope.launch {
             repository.initResult.collect { result ->
-                when (result) {
-                    is InitResult.Success -> _uiState.update { it.copy(error = null) }
-                    is InitResult.Failure -> _uiState.update { it.copy(error = result.message, isLoading = false) }
+                if (result.isSuccess) {
+                    _uiState.update { it.copy(error = null) }
+                } else {
+                    val msg = result.exceptionOrNull()?.message ?: "Unknown error"
+                    _uiState.update { it.copy(error = msg, isLoading = false) }
                 }
             }
         }

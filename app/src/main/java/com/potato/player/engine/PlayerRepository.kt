@@ -1,6 +1,5 @@
 package com.potato.player.engine
 
-import `is`.xyz.mpv.MPVLib  // only for InitResult type re-export
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -11,7 +10,7 @@ import kotlinx.coroutines.launch
 
 class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
 
-    val initResult: SharedFlow<InitResult> = engine.initResult
+    val initResult: SharedFlow<Result<Unit>> = engine.initResult
 
     private val _isPaused    = MutableStateFlow(true)
     private val _positionSec = MutableStateFlow(0.0)

@@ -7,10 +7,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import java.util.concurrent.atomic.AtomicBoolean
 
-sealed class InitResult {
-    object Success : InitResult()
-    data class Failure(val message: String) : InitResult()
-}
 
 class MpvEngine(private val context: Context) {
 
@@ -19,8 +15,8 @@ class MpvEngine(private val context: Context) {
     val surface      = MpvSurface(executor)
     val configurator = MpvOptionsConfigurator()
 
-    private val _initResult = MutableSharedFlow<InitResult>(replay = 1)
-    val initResult: SharedFlow<InitResult> = _initResult
+    private val _initResult = MutableSharedFlow<Result<Unit>>(replay = 1)
+    val initResult: SharedFlow<Result<Unit>> = _initResult
 
     private val initialized = AtomicBoolean(false)
 
@@ -48,13 +44,13 @@ class MpvEngine(private val context: Context) {
                 MPVLib.addObserver(dispatcher)
                 configurator.registerPropertyObservers()
 
-                _initResult.tryEmit(InitResult.Success)
+                _initResult.tryEmit(Result.success(Unit))
                 Log.d(TAG, "init complete")
             } catch (e: Exception) {
                 initialized.set(false)
                 executor.setAlive(false)
                 Log.e(TAG, "init failed", e)
-                _initResult.tryEmit(InitResult.Failure(e.message ?: "Unknown error"))
+                _initResult.tryEmit(Result.failure(Exception(e.message ?: "Unknown error")))
             }
         }
     }
