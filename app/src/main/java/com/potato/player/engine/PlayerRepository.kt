@@ -209,6 +209,20 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
     fun stop()              { engine.executor.stop() }
 
     fun enterStandby() {
+        if (currentUri.isNotEmpty() && _durationSec.value > 0.0) {
+            val historyEntry = VideoHistory(
+                uri = currentUri,
+                title = if (currentTitle.isNotEmpty()) currentTitle else currentUri.substringAfterLast('/'),
+                lastPlayedPositionSec = _positionSec.value,
+                durationSec = _durationSec.value,
+                lastAudioTrackId = _currentAudioTrackId.value,
+                lastSubtitleTrackId = _currentSubtitleTrackId.value,
+                lastPlayedTimestamp = System.currentTimeMillis()
+            )
+            repoScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                database.videoHistoryDao().upsert(historyEntry)
+            }
+        }
         engine.enterStandby()
         _fileLoaded.value = false; _isLoading.value = false; _isPaused.value = true
         _positionSec.value = 0.0; _durationSec.value = 0.0; _cachedSec.value = 0.0; _cacheDurationSec.value = 0.0
