@@ -76,7 +76,6 @@ fun AppNavigation(
             val activity = LocalContext.current.findActivity()
 
             DisposableEffect(Unit) {
-                engine.init()
                 onDispose {
                     repository.enterStandby()
                 }
