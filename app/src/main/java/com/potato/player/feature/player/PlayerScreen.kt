@@ -176,7 +176,7 @@ fun PlayerScreen(
                 }
         )
 
-        // ── Double-Tap Seek Overlay Ripple ───────────────────────────────────
+        // ── Double-Tap Seek Overlay ──────────────────────────────────────────
         if (!uiState.isInPipMode) {
             DoubleTapSeekOverlay(seekState = doubleTapSeekState)
         }
