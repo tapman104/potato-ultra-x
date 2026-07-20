@@ -11,8 +11,6 @@ import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.view.WindowManager
 import androidx.compose.runtime.collectAsState
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.potato.player.engine.MpvEngine
@@ -34,11 +32,6 @@ class MainActivity : ComponentActivity() {
 
         // Immersive full-screen
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        WindowInsetsControllerCompat(window, window.decorView).apply {
-            hide(WindowInsetsCompat.Type.systemBars())
-            systemBarsBehavior =
-                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        }
 
         setContent {
             val navController = rememberNavController()

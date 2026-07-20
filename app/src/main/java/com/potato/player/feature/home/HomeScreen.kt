@@ -15,6 +15,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import android.content.pm.ActivityInfo
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.potato.player.util.MediaMetadataRepository
 import com.potato.player.util.findActivity
 import com.potato.player.util.lockOrientation
@@ -28,13 +30,17 @@ fun HomeScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
 
     DisposableEffect(lifecycleOwner, activity) {
+        val window = activity?.window
+        val controller = window?.let { WindowInsetsControllerCompat(it, it.decorView) }
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
+                controller?.show(WindowInsetsCompat.Type.systemBars())
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
+        controller?.show(WindowInsetsCompat.Type.systemBars())
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
