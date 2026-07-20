@@ -45,7 +45,8 @@ data class PlayerUiState(
     val activeSheet: ActiveSheet = ActiveSheet.NONE,
     val videoWidth: Int = 0,
     val videoHeight: Int = 0,
-    val orientationMode: OrientationMode = OrientationMode.AUTO
+    val orientationMode: OrientationMode = OrientationMode.AUTO,
+    val isAutoRotation: Boolean = false
 )
 
 class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
@@ -61,6 +62,7 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
     init {
         viewModelScope.launch { prefsRepository.subScaleFlow.collect { repository.setSubScale(it) } }
         viewModelScope.launch { prefsRepository.subPosFlow.collect { repository.setSubPos(it) } }
+        viewModelScope.launch { prefsRepository.autoRotationFlow.collect { v -> _uiState.update { it.copy(isAutoRotation = v) } } }
         viewModelScope.launch {
             repository.initResult.collect { result ->
                 if (result.isSuccess) {
@@ -100,6 +102,12 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
             OrientationMode.LOCK_PORTRAIT -> OrientationMode.AUTO
         }
         _uiState.update { it.copy(orientationMode = next) }
+    }
+
+    fun toggleAutoRotation() {
+        val next = !_uiState.value.isAutoRotation
+        _uiState.update { it.copy(isAutoRotation = next) }
+        viewModelScope.launch { prefsRepository.setAutoRotation(next) }
     }
 
     fun setDecoder(mode: String) {

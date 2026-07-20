@@ -10,7 +10,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PictureInPicture
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.ScreenLockLandscape
+import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.os.Build
 import com.potato.player.util.TimeFormatter
 
 @Composable
@@ -30,11 +34,14 @@ fun PlayerBottomControls(
     durationMs: Long,
     cachedPositionMs: Long = 0L,
     bufferDurationMs: Long = 0L,
+    isAutoRotation: Boolean = false,
     onTogglePlay: () -> Unit,
     onSeekGesture: (Long) -> Unit,    // called continuously during drag
     onSeekCommit: (Long) -> Unit,     // called once on finger lift
     onDragStart: () -> Unit,          // tells repository to suppress echo-backs
     onDragEnd: () -> Unit,            // tells repository to re-enable echo-backs
+    onToggleAutoRotation: () -> Unit = {},
+    onEnterPip: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     // dragFraction: -1f means "not dragging"; any >= 0f means actively scrubbing
@@ -215,6 +222,39 @@ fun PlayerBottomControls(
                     tint            = Color.Black,
                     modifier        = Modifier.size(36.dp)
                 )
+            }
+        }
+
+        // ── Auto-Rotation + PiP — bottom-right corner ────────────────────────
+        val onToggleAutoRotationRef = rememberUpdatedState(onToggleAutoRotation)
+        val onEnterPipRef           = rememberUpdatedState(onEnterPip)
+        val handleToggleAutoRotation = remember { { onToggleAutoRotationRef.value() } }
+        val handleEnterPip           = remember { { onEnterPipRef.value() } }
+        val buttonModifier = PlayerControlsStyles.iconButtonModifier
+
+        Row(
+            modifier              = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment     = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = handleToggleAutoRotation, modifier = buttonModifier) {
+                Icon(
+                    imageVector        = if (isAutoRotation) Icons.Default.ScreenRotation else Icons.Default.ScreenLockLandscape,
+                    contentDescription = if (isAutoRotation) "Auto-rotation on" else "Rotation locked",
+                    tint               = if (isAutoRotation) Color(0xFF90CAF9) else Color.White
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                IconButton(onClick = handleEnterPip, modifier = buttonModifier) {
+                    Icon(
+                        imageVector        = Icons.Default.PictureInPicture,
+                        contentDescription = "Picture-in-Picture",
+                        tint               = Color.White
+                    )
+                }
             }
         }
     }

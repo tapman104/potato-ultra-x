@@ -1,6 +1,8 @@
 package com.potato.player.feature.player
 
 import android.view.SurfaceView
+import android.os.Build
+import android.app.PictureInPictureParams
 import androidx.compose.animation.*
 import com.potato.player.util.MediaMetadataRepository
 import androidx.compose.foundation.background
@@ -235,11 +237,20 @@ fun PlayerScreen(
                     durationMs        = (uiState.durationSec * 1000.0).toLong(),
                     cachedPositionMs  = (uiState.cachedSec * 1000.0).toLong(),
                     bufferDurationMs  = (uiState.cacheDurationSec * 1000.0).toLong(),
+                    isAutoRotation    = uiState.isAutoRotation,
                     onTogglePlay      = viewModel::togglePlay,
                     onSeekGesture     = { ms -> viewModel.onSliderDragChange(ms / 1000.0) },
                     onSeekCommit      = { ms -> viewModel.onSliderDragEnd(ms / 1000.0) },
                     onDragStart       = { viewModel.onSliderDragStart(uiState.positionSec) },
-                    onDragEnd         = { /* already handled inside onSeekCommit path */ }
+                    onDragEnd         = { /* already handled inside onSeekCommit path */ },
+                    onToggleAutoRotation = { viewModel.toggleAutoRotation() },
+                    onEnterPip        = {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            activity?.enterPictureInPictureMode(
+                                PictureInPictureParams.Builder().build()
+                            )
+                        }
+                    }
                 )
             }
         }
@@ -277,11 +288,18 @@ private fun PlayerLifecycleEffect(activity: android.app.Activity?, uiState: Play
         }
     }
 
-    LaunchedEffect(uiState.fileLoaded, uiState.videoWidth, uiState.videoHeight, uiState.orientationMode) {
+    LaunchedEffect(uiState.fileLoaded, uiState.videoWidth, uiState.videoHeight, uiState.orientationMode, uiState.isAutoRotation) {
         if (!uiState.fileLoaded) return@LaunchedEffect
+        // isAutoRotation (bottom button): ON = free sensor, OFF = locked landscape.
+        // When ON, it takes precedence over the top-bar orientationMode cycle.
+        if (uiState.isAutoRotation) {
+            hasSetAspectOrientation = true
+            lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_SENSOR)
+            return@LaunchedEffect
+        }
         when (uiState.orientationMode) {
             OrientationMode.LOCK_LANDSCAPE -> { hasSetAspectOrientation = true; lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE) }
-            OrientationMode.LOCK_PORTRAIT -> { hasSetAspectOrientation = true; lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT) }
+            OrientationMode.LOCK_PORTRAIT  -> { hasSetAspectOrientation = true; lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT) }
             OrientationMode.AUTO -> {
                 if (!hasSetAspectOrientation && uiState.videoWidth > 0 && uiState.videoHeight > 0) {
                     val target = if (uiState.videoHeight > uiState.videoWidth) ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT else ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE

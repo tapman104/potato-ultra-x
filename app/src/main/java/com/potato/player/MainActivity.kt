@@ -1,6 +1,7 @@
 package com.potato.player
 
 import android.os.Bundle
+import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
@@ -132,6 +133,13 @@ class MainActivity : ComponentActivity() {
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
         mpvEngine?.surface?.isRotating?.set(true)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Don't pause playback when transitioning into PiP mode
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && isInPictureInPictureMode) return
+        mpvEngine?.executor?.pause()
     }
 
     override fun onDestroy() {
