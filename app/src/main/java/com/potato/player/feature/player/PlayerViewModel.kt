@@ -73,7 +73,7 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
         viewModelScope.launch { repository.subPos.collect   { v -> _uiState.update { it.copy(subPos = v) } } }
     }
 
-    fun loadFile(uri: String) { repository.loadFile(uri) }
+    fun loadFile(uri: String, title: String = "") { repository.loadFile(uri, title) }
     fun togglePlay()           { repository.togglePlay() }
 
     fun setDecoder(mode: String) {

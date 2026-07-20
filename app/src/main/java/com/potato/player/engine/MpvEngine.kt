@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import java.util.concurrent.atomic.AtomicBoolean
 
 
-class MpvEngine(private val context: Context) {
+class MpvEngine(val context: Context) {
 
     val executor     = MpvCommandExecutor()
     val dispatcher   = MpvEventDispatcher()

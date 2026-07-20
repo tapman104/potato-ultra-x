@@ -116,10 +116,10 @@ fun PlayerScreen(
     // Load the video once the surface is ready; also handles config-change re-attach
     LaunchedEffect(videoUri) {
         viewModel.surface.setSurfaceReadyCallback {
-            viewModel.loadFile(videoUri)
+            viewModel.loadFile(videoUri, title)
         }
         if (viewModel.surface.hasSurface()) {
-            viewModel.loadFile(videoUri)
+            viewModel.loadFile(videoUri, title)
         }
     }
 
