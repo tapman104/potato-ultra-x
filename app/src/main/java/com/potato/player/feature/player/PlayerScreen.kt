@@ -33,6 +33,7 @@ import com.potato.player.feature.player.controls.DoubleTapSeekState
 import com.potato.player.feature.player.controls.HoldToFastForward
 import com.potato.player.feature.player.controls.PlayerBottomControls
 import com.potato.player.feature.player.controls.PlayerTopBar
+import androidx.activity.compose.BackHandler
 import android.content.pm.ActivityInfo
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -47,6 +48,7 @@ fun PlayerScreen(
     viewModel: PlayerViewModel,
     onBack: () -> Unit,
 ) {
+    BackHandler { onBack() }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
