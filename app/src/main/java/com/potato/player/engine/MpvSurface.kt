@@ -20,6 +20,9 @@ class MpvSurface(private val executor: MpvCommandExecutor) : SurfaceHolder.Callb
     fun setSurfaceReadyCallback(cb: (() -> Unit)?) { surfaceReadyCallback = cb }
     fun hasSurface(): Boolean =
         attachedSurface != null || pendingAttachSurface.get() != null
+    /** Returns true only when the surface is fully attached and ready — NOT when merely pending. */
+    fun hasAttachedSurface(): Boolean = attachedSurface != null
+
 
     override fun surfaceCreated(holder: SurfaceHolder) {
         lastHolderSurface = holder.surface
@@ -89,8 +92,21 @@ class MpvSurface(private val executor: MpvCommandExecutor) : SurfaceHolder.Callb
 
     fun reattachSurface() {
         val s = lastHolderSurface
-        if (s != null && s.isValid) {
-            attachSurfaceInternal(s)
+        if (s == null || !s.isValid) return
+        // During a decoder switch we only need to re-attach the surface to the GPU
+        // output — we must NOT invoke surfaceReadyCallback because that would call
+        // loadFile() and restart the video from the beginning.
+        val gen = executor.nextSurfaceGeneration()
+        attachedSurface = s
+        pendingAttachSurface.set(s)
+        executor.execute {
+            if (!executor.isAlive()) return@execute
+            if (executor.isCurrentSurfaceGeneration(gen)) {
+                runCatching { MPVLib.attachSurface(s) }
+                runCatching { MPVLib.setOptionString("force-window", "yes") }
+                runCatching { MPVLib.setPropertyString("vo", "gpu") }
+                pendingAttachSurface.set(null)
+            }
         }
     }
 

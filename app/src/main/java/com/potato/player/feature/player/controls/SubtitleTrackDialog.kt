@@ -24,8 +24,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.potato.player.engine.TrackInfo
-import com.potato.player.feature.player.PlayerViewModel
+import com.potato.player.feature.player.PlayerUiState
 import kotlin.math.roundToInt
+
 
 @Composable
 fun SubtitleTrackDialog(
@@ -34,9 +35,10 @@ fun SubtitleTrackDialog(
     onSelectTrack: (Int) -> Unit,
     onLoadExternal: (Uri) -> Unit,
     onDismiss: () -> Unit,
-    viewModel: PlayerViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
+    uiState: PlayerUiState,
+    onSetSubtitleAppearance: (Double, Int) -> Unit,
+    onResetSubtitleAppearance: () -> Unit,
 ) {
-    val uiState by viewModel.uiState.collectAsState()
     var showAppearanceDialog by remember { mutableStateOf(false) }
 
     val accentColor = Color(0xFF90CAF9)
@@ -203,14 +205,14 @@ fun SubtitleTrackDialog(
             initialPosition = initialPosition,
             onApply = { size, position ->
                 val mpvPos = ((1f - position) * 100).roundToInt().coerceIn(0, 100)
-                viewModel.setSubtitleAppearance(size.toDouble(), mpvPos)
+                onSetSubtitleAppearance(size.toDouble(), mpvPos)
                 showAppearanceDialog = false
             },
             onDismiss = {
                 showAppearanceDialog = false
             },
             onReset = {
-                viewModel.resetSubtitleAppearance()
+                onResetSubtitleAppearance()
                 showAppearanceDialog = false
             }
         )

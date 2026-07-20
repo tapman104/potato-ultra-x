@@ -38,20 +38,27 @@ fun PlayerModals(
             currentTrackId = uiState.currentSubtitleTrackId,
             onSelectTrack = { viewModel.onSelectSubtitleTrack(it) },
             onLoadExternal = { uri -> viewModel.onLoadExternalSubtitle(uri, context) },
-            onDismiss = { viewModel.onDismissSubtitleDialog() }
+            onDismiss = { viewModel.onDismissSubtitleDialog() },
+            uiState = uiState,
+            onSetSubtitleAppearance = { scale, pos -> viewModel.setSubtitleAppearance(scale, pos) },
+            onResetSubtitleAppearance = { viewModel.resetSubtitleAppearance() }
         )
     }
 
-    PlayerRightSideSheet(
-        visible = uiState.activeSheet == ActiveSheet.MORE_MENU || uiState.activeSheet == ActiveSheet.SPEED,
-        currentSpeed = uiState.playbackSpeed,
-        onSelectSpeed = { viewModel.setPlaybackSpeed(it) },
-        onShowAudioDialog = { viewModel.onShowAudioDialog() },
-        onShowSubtitleDialog = { viewModel.onShowSubtitleDialog() },
-        onDismiss = {
-            if (uiState.activeSheet == ActiveSheet.MORE_MENU) viewModel.onMoreMenuDismiss()
-            else if (uiState.activeSheet == ActiveSheet.SPEED) viewModel.onDismissSpeedDialog()
-            else viewModel.onMoreMenuDismiss()
-        }
-    )
+    // ponytail: gate sheet on fileLoaded so it never appears on an empty player
+    if (uiState.fileLoaded) {
+        PlayerRightSideSheet(
+            visible = uiState.activeSheet == ActiveSheet.MORE_MENU || uiState.activeSheet == ActiveSheet.SPEED,
+            currentSpeed = uiState.playbackSpeed,
+            onSelectSpeed = { viewModel.setPlaybackSpeed(it) },
+            onShowAudioDialog = { viewModel.onShowAudioDialog() },
+            onShowSubtitleDialog = { viewModel.onShowSubtitleDialog() },
+            onDismiss = {
+                if (uiState.activeSheet == ActiveSheet.MORE_MENU) viewModel.onMoreMenuDismiss()
+                else if (uiState.activeSheet == ActiveSheet.SPEED) viewModel.onDismissSpeedDialog()
+                else viewModel.onMoreMenuDismiss()
+            }
+        )
+    }
 }
+

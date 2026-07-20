@@ -46,6 +46,9 @@ fun HomeScreen(
     DisposableEffect(lifecycleOwner, activity) {
         val window = activity?.window
         val controller = window?.let { WindowInsetsControllerCompat(it, it.decorView) }
+        // Apply immediately so we don't wait for the next ON_RESUME
+        lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
+        controller?.show(WindowInsetsCompat.Type.systemBars())
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
@@ -57,6 +60,7 @@ fun HomeScreen(
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
+
 
     var pendingUri by remember { mutableStateOf<Uri?>(null) }
 

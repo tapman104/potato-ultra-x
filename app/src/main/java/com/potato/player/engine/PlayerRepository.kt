@@ -105,17 +105,16 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
         resumePositionSec = 0.0
         hasSoughtOnStart = false
         _isLoading.value = true
+        _isPaused.value = false   // optimistically show Pause button immediately
+        // Bug fix: run DB lookup on IO *before* calling loadFile so resumePositionSec
+        // is guaranteed set before onPlaybackStarted fires (eliminates the race).
         repoScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val history = database.videoHistoryDao().getByUri(uri)
             if (history != null && history.lastPlayedPositionSec > 0) {
                 resumePositionSec = history.lastPlayedPositionSec
-                if (_fileLoaded.value && !hasSoughtOnStart) {
-                    hasSoughtOnStart = true
-                    engine.executor.seekCommit(resumePositionSec)
-                }
             }
+            engine.executor.loadFile(uri)
         }
-        engine.executor.loadFile(uri)
     }
     fun togglePlay() { engine.executor.togglePlay() }
     fun play()       { engine.executor.play() }
@@ -226,7 +225,9 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
         engine.enterStandby()
         _fileLoaded.value = false; _isLoading.value = false; _isPaused.value = true
         _positionSec.value = 0.0; _durationSec.value = 0.0; _cachedSec.value = 0.0; _cacheDurationSec.value = 0.0
-        _playbackSpeed.value = 1.0; normalPlaybackSpeed = 1.0; _hwdecCurrent.value = "HW+"
+        _playbackSpeed.value = 1.0; normalPlaybackSpeed = 1.0
+        // Bug fix: do NOT reset _hwdecCurrent here — it will update naturally from the
+        // MPV property event on next load. Resetting caused a stale "HW+" badge flash.
         _tracks.value = emptyList(); _currentAudioTrackId.value = -1; _currentSubtitleTrackId.value = -1
         _subScale.value = 1.0; _subPos.value = 100; _isFastForwarding.value = false
         isSliderSeeking = false; lastTimePosUpdate = 0L

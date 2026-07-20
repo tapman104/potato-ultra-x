@@ -3,7 +3,10 @@ package com.potato.player
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.*
+import androidx.compose.ui.graphics.Color
 import androidx.core.view.WindowCompat
 import android.content.ContentResolver
 import android.content.Intent
@@ -16,6 +19,21 @@ import androidx.navigation.compose.rememberNavController
 import com.potato.player.engine.MpvEngine
 import com.potato.player.engine.PlayerRepository
 import kotlinx.coroutines.flow.first
+
+private val AmoledDarkColorScheme = darkColorScheme(
+    background        = Color(0xFF000000),
+    surface           = Color(0xFF000000),
+    surfaceVariant    = Color(0xFF0D0D0D),
+    surfaceContainer  = Color(0xFF0A0A0A),
+    surfaceContainerHigh = Color(0xFF111111),
+    surfaceContainerHighest = Color(0xFF1A1A1A),
+    onBackground      = Color(0xFFFFFFFF),
+    onSurface         = Color(0xFFFFFFFF),
+    primary           = Color(0xFF90CAF9),
+    onPrimary         = Color(0xFF000000),
+    secondary         = Color(0xFF80CBC4),
+    onSecondary       = Color(0xFF000000)
+)
 
 class MainActivity : ComponentActivity() {
     private var pendingIntent by mutableStateOf<Intent?>(null)
@@ -34,44 +52,46 @@ class MainActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         setContent {
-            val navController = rememberNavController()
+            MaterialTheme(colorScheme = AmoledDarkColorScheme) {
+                val navController = rememberNavController()
 
-            // Engine lives for the entire activity lifetime
-            val engine = remember { MpvEngine(applicationContext) }
-            val repository = remember { PlayerRepository(engine) }
-            mpvEngine = engine
+                // Engine lives for the entire activity lifetime
+                val engine = remember { MpvEngine(applicationContext) }
+                val repository = remember { PlayerRepository(engine) }
+                mpvEngine = engine
 
-            DisposableEffect(Unit) {
-                engine.init()
-                onDispose { engine.destroy() }
-            }
-
-            val fileLoaded by repository.fileLoaded.collectAsState()
-            val isPaused by repository.isPaused.collectAsState()
-
-            DisposableEffect(fileLoaded, isPaused) {
-                if (fileLoaded && !isPaused) {
-                    window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                } else {
-                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                DisposableEffect(Unit) {
+                    engine.init()
+                    onDispose { engine.destroy() }
                 }
-                onDispose {
-                    window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+
+                val fileLoaded by repository.fileLoaded.collectAsState()
+                val isPaused by repository.isPaused.collectAsState()
+
+                DisposableEffect(fileLoaded, isPaused) {
+                    if (fileLoaded && !isPaused) {
+                        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    } else {
+                        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    }
+                    onDispose {
+                        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    }
                 }
-            }
 
-            AppNavigation(
-                navController = navController,
-                engine        = engine,
-                repository    = repository
-            )
+                AppNavigation(
+                    navController = navController,
+                    engine        = engine,
+                    repository    = repository
+                )
 
-            LaunchedEffect(navController, pendingIntent) {
-                if (pendingIntent == null) return@LaunchedEffect
-                navController.currentBackStackEntryFlow.first()
-                pendingIntent?.let { intent ->
-                    handleViewIntent(intent, navController)
-                    pendingIntent = null
+                LaunchedEffect(navController, pendingIntent) {
+                    if (pendingIntent == null) return@LaunchedEffect
+                    navController.currentBackStackEntryFlow.first()
+                    pendingIntent?.let { intent ->
+                        handleViewIntent(intent, navController)
+                        pendingIntent = null
+                    }
                 }
             }
         }

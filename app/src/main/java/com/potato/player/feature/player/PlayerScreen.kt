@@ -1,7 +1,5 @@
 package com.potato.player.feature.player
 
-import android.content.Context
-import android.net.Uri
 import android.view.SurfaceView
 import androidx.compose.animation.*
 import com.potato.player.util.MediaMetadataRepository
@@ -10,7 +8,6 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -19,15 +16,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
 import com.potato.player.feature.player.controls.DoubleTapSeekOverlay
 import com.potato.player.feature.player.controls.DoubleTapSeekState
 import com.potato.player.feature.player.controls.HoldToFastForward
@@ -52,33 +46,9 @@ fun PlayerScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
-    val lifecycleOwner = LocalLifecycleOwner.current
 
-    DisposableEffect(lifecycleOwner, activity) {
-        val window = activity?.window
-        val controller = window?.let { WindowInsetsControllerCompat(it, it.decorView) }
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE)
-                controller?.apply {
-                    hide(WindowInsetsCompat.Type.systemBars())
-                    systemBarsBehavior =
-                        WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                }
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE)
-        controller?.apply {
-            hide(WindowInsetsCompat.Type.systemBars())
-            systemBarsBehavior =
-                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        }
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-            controller?.show(WindowInsetsCompat.Type.systemBars())
-        }
-    }
+    // ponytail: orientation + insets boilerplate extracted for readability
+    PlayerLifecycleEffect(activity = activity)
 
     // Derive accurate display name or use provided title
     var fileName by remember(videoUri, title) { mutableStateOf(if (title.isNotBlank()) title else "Video") }
@@ -113,12 +83,15 @@ fun PlayerScreen(
         onDispose { viewModel.surface.setSurfaceReadyCallback(null) }
     }
 
-    // Load the video once the surface is ready; also handles config-change re-attach
+    // Load the video once the surface is ready; also handles config-change re-attach.
+    // Bug fix: use hasAttachedSurface() (not hasSurface()) so we only fire the
+    // immediate path when the surface is truly attached — prevents double-loadFile
+    // when pendingAttachSurface is set but attachedSurface is still null.
     LaunchedEffect(videoUri) {
         viewModel.surface.setSurfaceReadyCallback {
             viewModel.loadFile(videoUri, title)
         }
-        if (viewModel.surface.hasSurface()) {
+        if (viewModel.surface.hasAttachedSurface()) {
             viewModel.loadFile(videoUri, title)
         }
     }
@@ -276,3 +249,35 @@ fun PlayerScreen(
         )
     }
 }
+
+// ponytail: extracted from PlayerScreen — zero new logic
+@Composable
+private fun PlayerLifecycleEffect(activity: android.app.Activity?) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, activity) {
+        val window = activity?.window
+        val controller = window?.let { WindowInsetsControllerCompat(it, it.decorView) }
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE)
+                controller?.apply {
+                    hide(WindowInsetsCompat.Type.systemBars())
+                    systemBarsBehavior =
+                        WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE)
+        controller?.apply {
+            hide(WindowInsetsCompat.Type.systemBars())
+            systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        }
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            controller?.show(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+}
+
