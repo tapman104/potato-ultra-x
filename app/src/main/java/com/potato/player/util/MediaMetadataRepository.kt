@@ -57,7 +57,7 @@ object MediaMetadataRepository {
                         }
                     }
                 }
-                val cacheFile = File(context.cacheDir, fileName)
+                val cacheFile = File.createTempFile("sub_", ".tmp", context.cacheDir)
                 context.contentResolver.openInputStream(uri)?.use { input ->
                     cacheFile.outputStream().use { output ->
                         input.copyTo(output)
