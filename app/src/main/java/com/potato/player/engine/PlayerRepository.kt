@@ -30,7 +30,7 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
 
     private val _isFastForwarding = MutableStateFlow(false)
     val isFastForwarding: StateFlow<Boolean> = _isFastForwarding.asStateFlow()
-    private var normalPlaybackSpeed = 1.0
+    @Volatile private var normalPlaybackSpeed = 1.0
 
     val isPaused:    StateFlow<Boolean> = _isPaused
     val positionSec: StateFlow<Double>  = _positionSec
