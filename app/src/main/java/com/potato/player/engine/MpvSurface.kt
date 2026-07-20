@@ -14,10 +14,14 @@ class MpvSurface(private val executor: MpvCommandExecutor) : SurfaceHolder.Callb
     @Volatile private var attachedSurface: Surface? = null
     private val pendingAttachSurface = AtomicReference<Surface?>(null)
     private var surfaceReadyCallback: (() -> Unit)? = null
+    /** Invoked on main thread when the surface re-attaches after a background/resume cycle.
+     *  Unlike surfaceReadyCallback, this does NOT trigger loadFile(). */
+    @Volatile private var onSurfaceReattached: (() -> Unit)? = null
     private var lastHolderSurface: Surface? = null
     val isRotating = AtomicBoolean(false)
 
     fun setSurfaceReadyCallback(cb: (() -> Unit)?) { surfaceReadyCallback = cb }
+    fun setSurfaceReattachedCallback(cb: (() -> Unit)?) { onSurfaceReattached = cb }
     fun hasSurface(): Boolean =
         attachedSurface != null || pendingAttachSurface.get() != null
     /** Returns true only when the surface is fully attached and ready — NOT when merely pending. */
@@ -117,8 +121,9 @@ class MpvSurface(private val executor: MpvCommandExecutor) : SurfaceHolder.Callb
         if (surface == null || !surface.isValid || surface == attachedSurface) return
         attachedSurface = surface
         pendingAttachSurface.set(surface)
-        val gen      = executor.nextSurfaceGeneration()
-        val callback = surfaceReadyCallback
+        val gen             = executor.nextSurfaceGeneration()
+        val readyCb         = surfaceReadyCallback
+        val reattachCb      = onSurfaceReattached
         executor.execute {
             if (!executor.isAlive()) return@execute
             if (executor.isCurrentSurfaceGeneration(gen)) {
@@ -127,7 +132,13 @@ class MpvSurface(private val executor: MpvCommandExecutor) : SurfaceHolder.Callb
                 runCatching { MPVLib.setOptionString("force-window", "yes") }
                 runCatching { MPVLib.setPropertyString("vo", "gpu") }
                 pendingAttachSurface.set(null)
-                mainHandler.post { callback?.invoke() }
+                mainHandler.post {
+                    when {
+                        readyCb   != null -> readyCb()    // first load — call loadFile()
+                        reattachCb != null -> reattachCb() // resume — reattach without restart
+                        // else: no callback registered yet; ON_RESUME guard in PlayerScreen covers this
+                    }
+                }
             } else {
                 Log.d(TAG, "attachSurface skipped — stale gen=$gen")
             }

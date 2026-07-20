@@ -50,7 +50,7 @@ fun PlayerScreen(
     val activity = remember(context) { context.findActivity() }
 
     // ponytail: orientation + insets boilerplate extracted for readability
-    PlayerLifecycleEffect(activity = activity, uiState = uiState)
+    PlayerLifecycleEffect(activity = activity, uiState = uiState, viewModel = viewModel)
 
     // Derive accurate display name or use provided title
     var fileName by remember(videoUri, title) { mutableStateOf(if (title.isNotBlank()) title else "Video") }
@@ -86,9 +86,12 @@ fun PlayerScreen(
         }
     }
 
-    // Clean up surface callback when composable leaves composition
+    // Clean up both surface callbacks when composable leaves composition
     DisposableEffect(Unit) {
-        onDispose { viewModel.surface.setSurfaceReadyCallback(null) }
+        onDispose {
+            viewModel.surface.setSurfaceReadyCallback(null)
+            viewModel.surface.setSurfaceReattachedCallback(null)
+        }
     }
 
     // Load the video once the surface is ready; also handles config-change re-attach.
@@ -98,6 +101,10 @@ fun PlayerScreen(
     LaunchedEffect(videoUri) {
         viewModel.surface.setSurfaceReadyCallback {
             viewModel.loadFile(videoUri, title)
+        }
+        // Resume path: re-attach surface on return from Recents without restarting the file.
+        viewModel.surface.setSurfaceReattachedCallback {
+            viewModel.resumeAfterSurfaceReattach()
         }
         if (viewModel.surface.hasAttachedSurface()) {
             viewModel.loadFile(videoUri, title)
@@ -277,7 +284,11 @@ fun PlayerScreen(
 
 // ponytail: extracted from PlayerScreen — zero new logic
 @Composable
-private fun PlayerLifecycleEffect(activity: android.app.Activity?, uiState: PlayerUiState) {
+private fun PlayerLifecycleEffect(
+    activity: android.app.Activity?,
+    uiState: PlayerUiState,
+    viewModel: PlayerViewModel
+) {
     val lifecycleOwner = LocalLifecycleOwner.current
     var hasSetAspectOrientation by remember { mutableStateOf(false) }
 
@@ -326,6 +337,12 @@ private fun PlayerLifecycleEffect(activity: android.app.Activity?, uiState: Play
             if (event == Lifecycle.Event.ON_RESUME) {
                 applyInsets()
                 updateOrientation()
+                // Race-condition guard: if surfaceCreated fired before LaunchedEffect
+                // re-registered the reattach callback (or callbacks were cleared by
+                // onDispose before surfaceCreated), manually reattach here.
+                if (!viewModel.surface.hasAttachedSurface() && uiState.fileLoaded) {
+                    viewModel.resumeAfterSurfaceReattach()
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)

@@ -95,6 +95,20 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
     }
 
     fun loadFile(uri: String, title: String = "") { repository.loadFile(uri, title) }
+
+    /**
+     * Called when the SurfaceView is re-created after the app returns from Recents.
+     * Reattaches the MPV surface without restarting the file, then resumes playback
+     * only if the player was already playing before backgrounding.
+     */
+    fun resumeAfterSurfaceReattach() {
+        if (!_uiState.value.fileLoaded) return
+        repository.engine.surface.reattachSurface()
+        if (_uiState.value.isPlaying) {
+            repository.play()
+        }
+    }
+
     fun togglePlay()           { repository.togglePlay() }
 
     fun cycleOrientationMode() {
