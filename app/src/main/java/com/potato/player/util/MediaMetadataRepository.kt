@@ -10,29 +10,15 @@ import java.io.File
 
 object MediaMetadataRepository {
 
-    suspend fun resolveTitle(context: Context, uri: Uri): String = withContext(Dispatchers.IO) {
-        if (uri.scheme == "content") {
-            try {
-                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                    if (cursor.moveToFirst()) {
-                        val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                        if (nameIndex != -1) {
-                            val name = cursor.getString(nameIndex)
-                            if (!name.isNullOrBlank()) return@withContext name
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-                Log.w("MediaMetadataRepository", "Failed to query title for $uri", e)
-            }
-        }
-        uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
-            ?: uri.toString().substringAfterLast('/').takeIf { it.isNotBlank() }
-            ?: "Video"
-    }
+    suspend fun resolveTitle(context: Context, uri: Uri): String =
+        resolveDisplayName(context, uri.toString())
 
-    suspend fun resolveFileName(context: Context, videoUriString: String): String = withContext(Dispatchers.IO) {
-        val decoded = Uri.decode(videoUriString)
+    suspend fun resolveFileName(context: Context, videoUriString: String): String =
+        resolveDisplayName(context, videoUriString)
+
+    // ponytail: delete the copy, keep the contract
+    private suspend fun resolveDisplayName(context: Context, uriString: String): String = withContext(Dispatchers.IO) {
+        val decoded = Uri.decode(uriString)
         val parsedUri = Uri.parse(decoded)
 
         if (parsedUri.scheme == "content") {
@@ -47,7 +33,7 @@ object MediaMetadataRepository {
                     }
                 }
             } catch (e: Exception) {
-                Log.w("MediaMetadataRepository", "Failed to query file name for $videoUriString", e)
+                Log.w("MediaMetadataRepository", "Failed to query display name for $uriString", e)
             }
         }
 
