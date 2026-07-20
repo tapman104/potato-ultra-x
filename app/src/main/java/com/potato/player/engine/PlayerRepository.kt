@@ -196,7 +196,13 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
     override fun onFileLoaded() { _fileLoaded.value = true; _isLoading.value = false; loadTracks() }
     override fun onPlaybackStarted() { _isPaused.value = false; _isLoading.value = false; flushPendingSeeks() }
     override fun onSeek() { flushPendingSeeks() }
-    override fun onPlaybackStopped(endReason: Int) { _isPaused.value = true; _isFastForwarding.value = false }
+    override fun onPlaybackStopped(endReason: Int) {
+        _isPaused.value = true
+        if (_isFastForwarding.value) {
+            engine.executor.setPlaybackSpeed(normalPlaybackSpeed)
+        }
+        _isFastForwarding.value = false
+    }
 
     override fun onPropertyChange(name: String, value: Any?) {
         when (name) {
@@ -210,7 +216,7 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
             MpvProp.DURATION -> (value as? Double)?.let { _durationSec.value = it }
             MpvProp.DEMUXER_CACHE_TIME -> (value as? Double)?.let { _cachedSec.value = it }
             MpvProp.DEMUXER_CACHE_DURATION -> (value as? Double)?.let { _cacheDurationSec.value = it }
-            MpvProp.SPEED -> (value as? Double)?.let { if (!_isFastForwarding.value && it != 2.0) _playbackSpeed.value = it }
+            MpvProp.SPEED -> (value as? Double)?.let { if (!_isFastForwarding.value) { _playbackSpeed.value = it } }
             MpvProp.HWDEC_CURRENT -> (value as? String)?.let {
                 _hwdecCurrent.value = when {
                     it == "no" || it.isEmpty() -> "SW"
