@@ -4,7 +4,10 @@ import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.History
@@ -21,6 +24,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import android.content.pm.ActivityInfo
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.potato.player.data.AppDatabase
+import com.potato.player.data.VideoHistory
 import com.potato.player.util.MediaMetadataRepository
 import com.potato.player.util.findActivity
 import com.potato.player.util.lockOrientation
@@ -33,6 +38,10 @@ fun HomeScreen(
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
     val lifecycleOwner = LocalLifecycleOwner.current
+    val database = remember(context) { AppDatabase.getInstance(context) }
+    val recentList by remember(database) {
+        database.videoHistoryDao().getAllOrderedByTimestamp()
+    }.collectAsState(initial = emptyList())
 
     DisposableEffect(lifecycleOwner, activity) {
         val window = activity?.window
@@ -44,8 +53,6 @@ fun HomeScreen(
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
-        controller?.show(WindowInsetsCompat.Type.systemBars())
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
@@ -62,21 +69,19 @@ fun HomeScreen(
         }
     }
 
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+
     val launcher = rememberLauncherForActivityResult(
-        ActivityResultContracts.GetContent()
+        contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         if (uri != null) {
             pendingUri = uri
         }
     }
 
-    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-
     Scaffold(
         topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("Potato Player") }
-            )
+            TopAppBar(title = { Text("Potato Player") })
         },
         bottomBar = {
             NavigationBar {
@@ -109,9 +114,50 @@ fun HomeScreen(
                     Text("Open Video")
                 }
             } else {
-                Text("Coming soon")
+                if (recentList.isEmpty()) {
+                    Text("No recent videos")
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(recentList, key = { it.uri }) { entry ->
+                            val progress = if (entry.durationSec > 0.0) {
+                                (entry.lastPlayedPositionSec / entry.durationSec).toFloat().coerceIn(0f, 1f)
+                            } else 0f
+                            val dateString = remember(entry.lastPlayedTimestamp) {
+                                java.text.DateFormat.getDateTimeInstance(
+                                    java.text.DateFormat.SHORT,
+                                    java.text.DateFormat.SHORT
+                                ).format(java.util.Date(entry.lastPlayedTimestamp))
+                            }
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onNavigateToPlayer(entry.uri, entry.title) }
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(
+                                        text = entry.title,
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    LinearProgressIndicator(
+                                        progress = { progress },
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = dateString,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 }
-
