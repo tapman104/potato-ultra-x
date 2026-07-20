@@ -193,7 +193,7 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
     // ── MpvEventListener ─────────────────────────────────────────────────────
 
     override fun onFileLoaded() { _fileLoaded.value = true; _isLoading.value = false; loadTracks() }
-    override fun onPlaybackStarted() { _isPaused.value = false; _isLoading.value = false; flushPendingSeeks() }
+    override fun onPlaybackStarted() { _isLoading.value = false; flushPendingSeeks() }
     override fun onSeek() { flushPendingSeeks() }
     override fun onPlaybackStopped(endReason: Int) {
         _isPaused.value = true
