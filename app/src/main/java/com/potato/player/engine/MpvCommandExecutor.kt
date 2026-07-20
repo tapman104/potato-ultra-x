@@ -84,6 +84,7 @@ class MpvCommandExecutor {
         execute {
             if (!isAlive()) return@execute
             MPVLib.command("loadfile", path, "replace")
+            MPVLib.setPropertyBoolean("pause", false)
             MPVLib.setPropertyString("demuxer-max-bytes",      "50MiB")
             MPVLib.setPropertyString("demuxer-max-back-bytes", "20MiB")
         }
