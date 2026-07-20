@@ -9,3 +9,7 @@ tailrec fun Context.findActivity(): Activity? = when (this) {
     is ContextWrapper -> baseContext.findActivity()
     else -> null
 }
+
+fun lockOrientation(activity: Activity?, orientation: Int) {
+    activity?.requestedOrientation = orientation
+}
