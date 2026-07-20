@@ -41,12 +41,26 @@ fun AppNavigation(
     val lifecycleOwner = LocalLifecycleOwner.current
 
     // App-level lifecycle monitoring: pause MPV when app goes to background (onPause)
+    // and resume playback when returning (onResume) — guards against warm-resume black screen
+    // where the SurfaceView is preserved and surfaceChanged never fires to re-trigger loadFile.
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_PAUSE) {
-                if (!repository.isPaused.value) {
-                    repository.pause()
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> {
+                    if (!repository.isPaused.value) {
+                        repository.pause()
+                    }
                 }
+                Lifecycle.Event.ON_RESUME -> {
+                    // Only unpause if a file is already loaded. If the surface was destroyed
+                    // and recreated (GPU context loss path), loadFile() will be called by
+                    // attachSurfaceInternal → surfaceReadyCallback, which unpauses itself.
+                    // This branch handles the common case where the surface is preserved.
+                    if (repository.fileLoaded.value) {
+                        repository.play()
+                    }
+                }
+                else -> {}
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
