@@ -228,7 +228,9 @@ fun PlayerScreen(
                 visible = controlsVisible,
                 enter = fadeIn() + slideInVertically { -it },
                 exit = fadeOut() + slideOutVertically { -it },
-                modifier = Modifier.align(Alignment.TopCenter)
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .windowInsetsPadding(WindowInsets.displayCutout)
             ) {
                 PlayerTopBar(
                     fileName              = fileName,
@@ -246,7 +248,10 @@ fun PlayerScreen(
                 visible = controlsVisible,
                 enter = fadeIn() + slideInVertically { it },
                 exit = fadeOut() + slideOutVertically { it },
-                modifier = Modifier.align(Alignment.BottomCenter)
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .windowInsetsPadding(WindowInsets.displayCutout)
+                    .navigationBarsPadding()
             ) {
                 PlayerBottomControls(
                     isPlaying        = uiState.isPlaying,
