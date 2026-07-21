@@ -86,38 +86,6 @@ fun PlayerBottomControls(
         val handleEnterPip           = remember { { onEnterPipRef.value() } }
         val buttonModifier = PlayerControlsStyles.iconButtonModifier
 
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp),
-            contentAlignment = Alignment.CenterEnd
-        ) {
-            // Auto-Rotation + PiP — bottom-right corner
-            Row(
-                modifier              = Modifier.align(Alignment.CenterEnd),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment     = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = handleToggleAutoRotation, modifier = buttonModifier) {
-                    Icon(
-                        imageVector        = if (isAutoRotation) Icons.Default.ScreenRotation else Icons.Default.ScreenLockLandscape,
-                        contentDescription = if (isAutoRotation) "Auto-rotation on" else "Rotation locked",
-                        tint               = if (isAutoRotation) Color(0xFF90CAF9) else Color.White
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    IconButton(onClick = handleEnterPip, modifier = buttonModifier) {
-                        Icon(
-                            imageVector        = Icons.Default.PictureInPicture,
-                            contentDescription = "Picture-in-Picture",
-                            tint               = Color.White
-                        )
-                    }
-                }
-            }
-        }
-
         // Time row: current position left, total duration right
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -158,5 +126,37 @@ fun PlayerBottomControls(
             onValueChange         = onValueChange,
             onValueChangeFinished = onValueChangeFinished
         )
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            contentAlignment = Alignment.CenterEnd
+        ) {
+            // Auto-Rotation + PiP — bottom-right corner
+            Row(
+                modifier              = Modifier.align(Alignment.CenterEnd),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment     = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = handleToggleAutoRotation, modifier = buttonModifier) {
+                    Icon(
+                        imageVector        = if (isAutoRotation) Icons.Default.ScreenRotation else Icons.Default.ScreenLockLandscape,
+                        contentDescription = if (isAutoRotation) "Auto-rotation on" else "Rotation locked",
+                        tint               = if (isAutoRotation) Color(0xFF90CAF9) else Color.White
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    IconButton(onClick = handleEnterPip, modifier = buttonModifier) {
+                        Icon(
+                            imageVector        = Icons.Default.PictureInPicture,
+                            contentDescription = "Picture-in-Picture",
+                            tint               = Color.White
+                        )
+                    }
+                }
+            }
+        }
     }
 }
