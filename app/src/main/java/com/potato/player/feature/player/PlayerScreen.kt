@@ -60,23 +60,13 @@ fun PlayerScreen(
         }
     }
 
-    var controlsVisible by remember { mutableStateOf(true) }
+    val controlsState = rememberControlsVisibilityState(
+        isPlaying = uiState.isPlaying,
+        dragPositionSec = uiState.dragPositionSec,
+        isInPipMode = uiState.isInPipMode
+    )
     var doubleTapSeekState by remember { mutableStateOf<DoubleTapSeekState?>(null) }
     var isLongPressActive by remember { mutableStateOf(false) }
-
-    // Auto-hide controls after 4 seconds of inactivity when playing & not dragging seek bar
-    LaunchedEffect(controlsVisible, uiState.isPlaying, uiState.dragPositionSec) {
-        if (controlsVisible && uiState.isPlaying && uiState.dragPositionSec == null) {
-            delay(4000L)
-            controlsVisible = false
-        }
-    }
-
-    LaunchedEffect(uiState.isInPipMode) {
-        if (uiState.isInPipMode) {
-            controlsVisible = false
-        }
-    }
 
     // Clear double-tap seek overlay after animation
     LaunchedEffect(doubleTapSeekState?.triggerId) {
@@ -164,7 +154,7 @@ fun PlayerScreen(
                             }
                         },
                         onTap = {
-                            controlsVisible = !controlsVisible
+                            controlsState.toggle()
                         }
                     )
                 }
@@ -194,7 +184,7 @@ fun PlayerScreen(
                 visible = uiState.isFastForwarding || isLongPressActive,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = if (controlsVisible) 72.dp else 36.dp)
+                    .padding(top = if (controlsState.isVisible) 72.dp else 36.dp)
             )
         }
 
@@ -219,7 +209,7 @@ fun PlayerScreen(
 
             // ── Top bar ──────────────────────────────────────────────────────
             AnimatedVisibility(
-                visible = controlsVisible,
+                visible = controlsState.isVisible,
                 enter = fadeIn() + slideInVertically { -it },
                 exit = fadeOut() + slideOutVertically { -it },
                 modifier = Modifier
@@ -239,7 +229,7 @@ fun PlayerScreen(
 
             // ── Bottom controls ──────────────────────────────────────────────
             AnimatedVisibility(
-                visible = controlsVisible,
+                visible = controlsState.isVisible,
                 enter = fadeIn() + slideInVertically { it },
                 exit = fadeOut() + slideOutVertically { it },
                 modifier = Modifier
