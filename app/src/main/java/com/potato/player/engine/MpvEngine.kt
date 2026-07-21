@@ -12,7 +12,7 @@ class MpvEngine(val context: Context) {
 
     val executor     = MpvCommandExecutor()
     val dispatcher   = MpvEventDispatcher()
-    val surface      = MpvSurface(executor)
+    val surface      = MpvSurface(executor, dispatcher)
     val configurator = MpvOptionsConfigurator()
 
     private val _initResult = MutableSharedFlow<Result<Unit>>(replay = 1)

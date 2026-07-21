@@ -50,11 +50,9 @@ fun AppNavigation(
                     if (!repository.isPaused.value) {
                         repository.pause()
                     }
-                    // Invalidate the confirmed-rendering flag so that reattachSurface() always
-                    // runs the full MPVLib.attachSurface + vo=gpu sequence on the next resume,
-                    // even on devices where the Surface object survives lock/background and
-                    // surfaceCreated() never fires to clear the stale GPU context.
-                    engine.surface.invalidateRenderState()
+                    // releaseForBackground() clears isMpvRendering, detaches the surface, and
+                    // resets vo so the next resume always builds a fresh EGL context.
+                    engine.surface.releaseForBackground()
                 }
                 Lifecycle.Event.ON_RESUME -> {
                     // Do NOT call repository.play() here. Resuming audio before the surface is

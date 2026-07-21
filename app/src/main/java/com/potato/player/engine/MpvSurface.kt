@@ -6,10 +6,15 @@ import android.util.Log
 import android.view.Surface
 import android.view.SurfaceHolder
 import `is`.xyz.mpv.MPVLib
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
-class MpvSurface(private val executor: MpvCommandExecutor) : SurfaceHolder.Callback {
+class MpvSurface(
+    private val executor: MpvCommandExecutor,
+    private val dispatcher: MpvEventDispatcher,
+) : SurfaceHolder.Callback {
 
     @Volatile private var attachedSurface: Surface? = null
     private val pendingAttachSurface = AtomicReference<Surface?>(null)
@@ -34,6 +39,21 @@ class MpvSurface(private val executor: MpvCommandExecutor) : SurfaceHolder.Callb
     /** Called on every app-background / lock so the next ON_RESUME forces a full re-attach even
      *  on devices where the Surface object survives and surfaceCreated() never fires. */
     fun invalidateRenderState() { isMpvRendering = false }
+    /**
+     * Called on app-background / lock. Clears isMpvRendering AND explicitly tears down
+     * the GPU context so the next resume always performs a clean re-attach, regardless of
+     * whether surfaceDestroyed() fires (on many OEM / MIUI devices it does not).
+     */
+    fun releaseForBackground() {
+        isMpvRendering = false
+        attachedSurface = null
+        pendingAttachSurface.set(null)
+        executor.execute {
+            if (!executor.isAlive()) return@execute
+            runCatching { MPVLib.detachSurface() }
+            runCatching { MPVLib.setPropertyString("vo", "null") }
+        }
+    }
 
 
     override fun surfaceCreated(holder: SurfaceHolder) {
@@ -65,14 +85,22 @@ class MpvSurface(private val executor: MpvCommandExecutor) : SurfaceHolder.Callb
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
         Log.d(TAG, "surfaceChanged ${width}x${height}")
         lastHolderSurface = holder.surface
-        attachSurfaceInternal(holder.surface)
+        // Fix 3: only drive a full re-attach when MPV is not already mid-reattach.
+        // Prevents a surface-generation race between this callback and ON_RESUME reattachSurface().
+        if (!isMpvRendering) {
+            attachSurfaceInternal(holder.surface)
+        }
         if (width > 0 && height > 0) {
             val size = "${width}x${height}"
             executor.execute {
                 if (!executor.isAlive()) return@execute
                 runCatching { MPVLib.setPropertyString("android-surface-size", size) }
-                runCatching { MPVLib.setOptionString("force-window", "yes") }
-                runCatching { MPVLib.setPropertyString("vo", "gpu") }
+                // Only nudge vo=gpu when MPV is confirmed rendering; otherwise the full
+                // re-attach sequence in reattachSurface() / attachSurfaceInternal() owns this.
+                if (isMpvRendering) {
+                    runCatching { MPVLib.setOptionString("force-window", "yes") }
+                    runCatching { MPVLib.setPropertyString("vo", "gpu") }
+                }
             }
         }
     }
@@ -123,6 +151,32 @@ class MpvSurface(private val executor: MpvCommandExecutor) : SurfaceHolder.Callb
         executor.execute {
             if (!executor.isAlive()) return@execute
             if (executor.isCurrentSurfaceGeneration(gen)) {
+                // Force EGL context teardown before re-attach. Without this, MPV reuses
+                // the stale GPU context from the surviving Surface object and renders into the void.
+                //
+                // Rather than a fixed Thread.sleep, we register a one-shot VIDEO_RECONFIG
+                // listener and block on a CountDownLatch until MPV confirms vo=null has taken
+                // effect (same pattern used by MpvEngine.prepareDecoderSwitch). Falls through
+                // after 500 ms on slow/loaded devices so playback always recovers.
+                val latch = CountDownLatch(1)
+                val voNullListener = object : MpvEventListener {
+                    override fun onFileLoaded() {}
+                    override fun onPlaybackStarted() {}
+                    override fun onPlaybackStopped(endReason: Int) {}
+                    override fun onPropertyChange(name: String, value: Any?) {}
+                    override fun onError(message: String) {}
+                    override fun onVideoReconfig() {
+                        dispatcher.removeListener(this)
+                        latch.countDown()
+                    }
+                }
+                dispatcher.addListener(voNullListener)
+                runCatching { MPVLib.detachSurface() }
+                runCatching { MPVLib.setPropertyString("vo", "null") }
+                // Block until VIDEO_RECONFIG fires or 500 ms elapses (safety timeout).
+                latch.await(500, TimeUnit.MILLISECONDS)
+                dispatcher.removeListener(voNullListener) // no-op if already removed on event
+                if (!executor.isCurrentSurfaceGeneration(gen)) return@execute // stale, bail
                 runCatching { MPVLib.attachSurface(s) }
                 runCatching { MPVLib.setOptionString("force-window", "yes") }
                 runCatching { MPVLib.setPropertyString("vo", "gpu") }
@@ -135,7 +189,13 @@ class MpvSurface(private val executor: MpvCommandExecutor) : SurfaceHolder.Callb
 
 
     private fun attachSurfaceInternal(surface: Surface?) {
-        if (surface == null || !surface.isValid || surface == attachedSurface) return
+        if (surface == null || !surface.isValid) return
+        // Fix 1: only skip if MPV is *actively rendering* into this exact surface.
+        // The old plain `surface == attachedSurface` identity check caused warm-resume black
+        // screens on OEM/MIUI devices where the Surface object survives lock/background:
+        // attachSurfaceInternal would bail immediately, MPVLib.attachSurface was never called,
+        // and the dead EGL context was never replaced.
+        if (isMpvRendering && surface == attachedSurface) return
         attachedSurface = surface
         pendingAttachSurface.set(surface)
         val gen             = executor.nextSurfaceGeneration()
