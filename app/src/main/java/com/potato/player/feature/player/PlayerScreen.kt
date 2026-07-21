@@ -10,7 +10,13 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -227,6 +233,28 @@ fun PlayerScreen(
                 )
             }
 
+            // ── Center play/pause ────────────────────────────────────────────
+            AnimatedVisibility(
+                visible = controlsState.isVisible,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier.align(Alignment.Center)
+            ) {
+                IconButton(
+                    onClick  = viewModel::togglePlay,
+                    modifier = Modifier
+                        .size(64.dp)
+                        .background(Color.White, shape = CircleShape)
+                ) {
+                    Icon(
+                        imageVector     = if (uiState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (uiState.isPlaying) "Pause" else "Play",
+                        tint            = Color.Black,
+                        modifier        = Modifier.size(36.dp)
+                    )
+                }
+            }
+
             // ── Bottom controls ──────────────────────────────────────────────
             AnimatedVisibility(
                 visible = controlsState.isVisible,
@@ -238,14 +266,12 @@ fun PlayerScreen(
                     .navigationBarsPadding()
             ) {
                 PlayerBottomControls(
-                    isPlaying        = uiState.isPlaying,
                     // ViewModel stores seconds; controls work in milliseconds
                     currentPositionMs = (uiState.positionSec * 1000.0).toLong(),
                     durationMs        = (uiState.durationSec * 1000.0).toLong(),
                     cachedPositionMs  = (uiState.cachedSec * 1000.0).toLong(),
                     bufferDurationMs  = (uiState.cacheDurationSec * 1000.0).toLong(),
                     isAutoRotation    = uiState.isAutoRotation,
-                    onTogglePlay      = viewModel::togglePlay,
                     onSeekGesture     = { ms -> viewModel.onSliderDragChange(ms / 1000.0) },
                     onSeekCommit      = { ms -> viewModel.onSliderDragEnd(ms / 1000.0) },
                     onDragStart       = { viewModel.onSliderDragStart(uiState.positionSec) },

@@ -3,13 +3,9 @@ package com.potato.player.feature.player.controls
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PictureInPicture
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.ScreenLockLandscape
 import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material3.*
@@ -24,13 +20,11 @@ import com.potato.player.util.TimeFormatter
 
 @Composable
 fun PlayerBottomControls(
-    isPlaying: Boolean,
     currentPositionMs: Long,
     durationMs: Long,
     cachedPositionMs: Long = 0L,
     bufferDurationMs: Long = 0L,
     isAutoRotation: Boolean = false,
-    onTogglePlay: () -> Unit,
     onSeekGesture: (Long) -> Unit,    // called continuously during drag
     onSeekCommit: (Long) -> Unit,     // called once on finger lift
     onDragStart: () -> Unit,          // tells repository to suppress echo-backs
@@ -96,23 +90,8 @@ fun PlayerBottomControls(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 12.dp),
-            contentAlignment = Alignment.Center
+            contentAlignment = Alignment.CenterEnd
         ) {
-            // Play / Pause — white circle, black icon
-            IconButton(
-                onClick  = onTogglePlay,
-                modifier = Modifier
-                    .size(64.dp)
-                    .background(Color.White, shape = CircleShape)
-            ) {
-                Icon(
-                    imageVector     = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (isPlaying) "Pause" else "Play",
-                    tint            = Color.Black,
-                    modifier        = Modifier.size(36.dp)
-                )
-            }
-
             // Auto-Rotation + PiP — bottom-right corner
             Row(
                 modifier              = Modifier.align(Alignment.CenterEnd),
