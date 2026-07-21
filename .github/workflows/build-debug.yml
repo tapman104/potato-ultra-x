@@ -1,6 +1,10 @@
 name: Build Debug APKs
 
 on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -12,45 +16,52 @@ jobs:
         with:
           lfs: true
 
-      - name: Pull Git LFS objects
-        run: git lfs pull
-
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
+          cache: 'gradle'
 
       - name: Make gradlew executable
         run: chmod +x gradlew
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug
+      - name: Build Debug APKs
+        run: ./gradlew assembleDebug --stacktrace
 
-      - name: Upload arm64-v8a
+      - name: Upload all Debug APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: potato-player-debug-apks
+          path: app/build/outputs/apk/debug/*.apk
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload arm64-v8a APK
         uses: actions/upload-artifact@v4
         with:
           name: potato-player-arm64-v8a
-          path: app/build/outputs/apk/debug/*arm64*.apk
+          path: app/build/outputs/apk/debug/*arm64-v8a*.apk
           retention-days: 7
 
-      - name: Upload armeabi-v7a
+      - name: Upload armeabi-v7a APK
         uses: actions/upload-artifact@v4
         with:
           name: potato-player-armeabi-v7a
-          path: app/build/outputs/apk/debug/*armeabi*.apk
+          path: app/build/outputs/apk/debug/*armeabi-v7a*.apk
           retention-days: 7
 
-      - name: Upload x86_64
+      - name: Upload x86_64 APK
         uses: actions/upload-artifact@v4
         with:
           name: potato-player-x86_64
           path: app/build/outputs/apk/debug/*x86_64*.apk
           retention-days: 7
 
-      - name: Upload x86
+      - name: Upload x86 APK
         uses: actions/upload-artifact@v4
         with:
           name: potato-player-x86
-          path: app/build/outputs/apk/debug/*x86-*.apk
+          path: app/build/outputs/apk/debug/*x86-debug*.apk
           retention-days: 7
+
