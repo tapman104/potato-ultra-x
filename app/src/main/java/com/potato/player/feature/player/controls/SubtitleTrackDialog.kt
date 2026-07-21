@@ -3,7 +3,6 @@ package com.potato.player.feature.player.controls
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,8 +10,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.RadioButtonChecked
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -41,8 +38,6 @@ fun SubtitleTrackDialog(
 ) {
     var showAppearanceDialog by remember { mutableStateOf(false) }
 
-    val accentColor = Color(0xFF90CAF9)
-
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -68,65 +63,21 @@ fun SubtitleTrackDialog(
                 // Row 0: "Off" option (id = -1)
                 item(key = "sub_off") {
                     val isSelected = currentTrackId == -1
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(
-                                if (isSelected) Color.White.copy(alpha = 0.15f)
-                                else Color.Transparent
-                            )
-                            .clickable { onSelectTrack(-1) }
-                            .padding(vertical = 12.dp, horizontal = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = if (isSelected) Icons.Default.RadioButtonChecked else Icons.Default.RadioButtonUnchecked,
-                            contentDescription = null,
-                            tint = if (isSelected) accentColor else Color.White.copy(alpha = 0.5f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = "Off",
-                            color = if (isSelected) accentColor else Color.White,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            fontSize = 15.sp,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
+                    TrackSelectionRow(
+                        label = "Off",
+                        isSelected = isSelected,
+                        onClick = { onSelectTrack(-1) }
+                    )
                 }
 
                 // Rows 1..N: embedded subtitle tracks
                 items(tracks, key = { it.id }) { track ->
                     val isSelected = track.id == currentTrackId
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(
-                                if (isSelected) Color.White.copy(alpha = 0.15f)
-                                else Color.Transparent
-                            )
-                            .clickable { onSelectTrack(track.id) }
-                            .padding(vertical = 12.dp, horizontal = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = if (isSelected) Icons.Default.RadioButtonChecked else Icons.Default.RadioButtonUnchecked,
-                            contentDescription = null,
-                            tint = if (isSelected) accentColor else Color.White.copy(alpha = 0.5f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Text(
-                            text = track.displayLabel(),
-                            color = if (isSelected) accentColor else Color.White,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            fontSize = 15.sp,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
+                    TrackSelectionRow(
+                        label = track.displayLabel(),
+                        isSelected = isSelected,
+                        onClick = { onSelectTrack(track.id) }
+                    )
                 }
 
                 // Last row: "Load external subtitle..."
