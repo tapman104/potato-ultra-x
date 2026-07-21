@@ -74,7 +74,10 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
         }
     }
 
-    fun togglePlay()           { repository.togglePlay() }
+    fun togglePlay() {
+        _uiState.update { it.copy(isPlaying = !it.isPlaying) }
+        repository.togglePlay()
+    }
 
     fun cycleOrientationMode() {
         val next = when (_uiState.value.orientationMode) {
