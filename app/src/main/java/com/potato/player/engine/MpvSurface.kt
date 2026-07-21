@@ -19,6 +19,11 @@ class MpvSurface(private val executor: MpvCommandExecutor) : SurfaceHolder.Callb
     @Volatile private var onSurfaceReattached: (() -> Unit)? = null
     private var lastHolderSurface: Surface? = null
     val isRotating = AtomicBoolean(false)
+    /** True only after MPVLib.attachSurface() + vo=gpu have been confirmed on the engine thread
+     *  for the current surface. Cleared whenever the app goes to background (via invalidateRenderState)
+     *  or the surface is destroyed (via detachAndDisableVo), so that the next ON_RESUME always
+     *  re-runs the full attach sequence regardless of whether the Surface object survived. */
+    @Volatile private var isMpvRendering = false
 
     fun setSurfaceReadyCallback(cb: (() -> Unit)?) { surfaceReadyCallback = cb }
     fun setSurfaceReattachedCallback(cb: (() -> Unit)?) { onSurfaceReattached = cb }
@@ -26,6 +31,9 @@ class MpvSurface(private val executor: MpvCommandExecutor) : SurfaceHolder.Callb
         attachedSurface != null || pendingAttachSurface.get() != null
     /** Returns true only when the surface is fully attached and ready — NOT when merely pending. */
     fun hasAttachedSurface(): Boolean = attachedSurface != null
+    /** Called on every app-background / lock so the next ON_RESUME forces a full re-attach even
+     *  on devices where the Surface object survives and surfaceCreated() never fires. */
+    fun invalidateRenderState() { isMpvRendering = false }
 
 
     override fun surfaceCreated(holder: SurfaceHolder) {
@@ -71,6 +79,7 @@ class MpvSurface(private val executor: MpvCommandExecutor) : SurfaceHolder.Callb
 
     fun detachAndDisableVo() {
         Log.d(TAG, "detachAndDisableVo")
+        isMpvRendering = false   // GPU context is being torn down; must re-attach on next resume
         attachedSurface = null
         pendingAttachSurface.set(null)
         executor.execute {
@@ -99,6 +108,12 @@ class MpvSurface(private val executor: MpvCommandExecutor) : SurfaceHolder.Callb
     fun reattachSurface() {
         val s = lastHolderSurface
         if (s == null || !s.isValid) return
+        // Idempotency guard: if MPV is already confirmed rendering into this exact surface,
+        // skip the re-attach. This prevents redundant GPU context setup when both the
+        // surfaceCreated callback path and the ON_RESUME guard call this in the same frame.
+        // isMpvRendering is always cleared on background/lock, so this will NOT skip the
+        // attach on the lock→unlock or background→foreground paths.
+        if (isMpvRendering && s == attachedSurface) return
         // During a decoder switch we only need to re-attach the surface to the GPU
         // output — we must NOT invoke surfaceReadyCallback because that would call
         // loadFile() and restart the video from the beginning.
@@ -112,6 +127,8 @@ class MpvSurface(private val executor: MpvCommandExecutor) : SurfaceHolder.Callb
                 runCatching { MPVLib.setOptionString("force-window", "yes") }
                 runCatching { MPVLib.setPropertyString("vo", "gpu") }
                 pendingAttachSurface.set(null)
+                // Confirm on main thread that MPV is now actively rendering.
+                mainHandler.post { isMpvRendering = true }
             }
         }
     }
@@ -135,7 +152,10 @@ class MpvSurface(private val executor: MpvCommandExecutor) : SurfaceHolder.Callb
                 mainHandler.post {
                     when {
                         readyCb   != null -> readyCb()    // first load — call loadFile()
-                        reattachCb != null -> reattachCb() // resume — reattach without restart
+                        reattachCb != null -> {            // resume — mark rendering live, then notify
+                            isMpvRendering = true
+                            reattachCb()
+                        }
                         // else: no callback registered yet; ON_RESUME guard in PlayerScreen covers this
                     }
                 }

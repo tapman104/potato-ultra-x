@@ -44,7 +44,17 @@ class MpvCommandExecutor {
         }
     }
 
-    fun play()       { execute { if (isAlive()) MPVLib.setPropertyBoolean("pause", false) } }
+    fun play() {
+        execute {
+            if (!isAlive()) return@execute
+            // Fix 3: unconditionally restore vo before unpausing so the video output
+            // is re-enabled even on the path where reattachSurface() was skipped or has
+            // not yet flushed. MPV handles idempotent property sets safely.
+            runCatching { MPVLib.setOptionString("force-window", "yes") }
+            runCatching { MPVLib.setPropertyString("vo", "gpu") }
+            MPVLib.setPropertyBoolean("pause", false)
+        }
+    }
     fun pause()      { execute { if (isAlive()) MPVLib.setPropertyBoolean("pause", true)  } }
     fun togglePlay() {
         execute {

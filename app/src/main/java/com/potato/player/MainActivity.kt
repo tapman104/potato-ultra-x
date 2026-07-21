@@ -145,7 +145,12 @@ class MainActivity : ComponentActivity() {
         super.onPause()
         // Don't pause playback when transitioning into PiP mode
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && isInPictureInPictureMode) return
-        mpvEngine?.executor?.pause()
+        // Fix 5: route through the repository so isPaused StateFlow stays consistent.
+        playerRepository?.pause()
+        // Mirror the invalidateRenderState() call in AppNavigation ON_PAUSE so that
+        // isMpvRendering is always cleared on background/lock, regardless of which
+        // code path (Activity override vs. Compose lifecycle observer) fires first.
+        mpvEngine?.surface?.invalidateRenderState()
     }
 
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {

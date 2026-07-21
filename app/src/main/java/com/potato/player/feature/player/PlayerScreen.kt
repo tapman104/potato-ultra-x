@@ -337,10 +337,15 @@ private fun PlayerLifecycleEffect(
             if (event == Lifecycle.Event.ON_RESUME) {
                 applyInsets()
                 updateOrientation()
-                // Race-condition guard: if surfaceCreated fired before LaunchedEffect
-                // re-registered the reattach callback (or callbacks were cleared by
-                // onDispose before surfaceCreated), manually reattach here.
-                if (!viewModel.surface.hasAttachedSurface() && uiState.fileLoaded) {
+                // Always call resumeAfterSurfaceReattach() on resume when a file is loaded.
+                // reattachSurface() is idempotent (guarded by isMpvRendering + attachedSurface
+                // identity check), so this is safe to call even when MPV is already rendering.
+                // Removing the old hasAttachedSurface() guard fixes the black screen on devices
+                // where the Surface Java object survives lock/unlock and surfaceCreated() never
+                // fires — in that case attachedSurface was non-null, the guard was false, and
+                // resumeAfterSurfaceReattach() was never called even though the EGL context
+                // had been invalidated by the display driver.
+                if (uiState.fileLoaded) {
                     viewModel.resumeAfterSurfaceReattach()
                 }
             }

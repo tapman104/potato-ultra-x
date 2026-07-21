@@ -50,15 +50,17 @@ fun AppNavigation(
                     if (!repository.isPaused.value) {
                         repository.pause()
                     }
+                    // Invalidate the confirmed-rendering flag so that reattachSurface() always
+                    // runs the full MPVLib.attachSurface + vo=gpu sequence on the next resume,
+                    // even on devices where the Surface object survives lock/background and
+                    // surfaceCreated() never fires to clear the stale GPU context.
+                    engine.surface.invalidateRenderState()
                 }
                 Lifecycle.Event.ON_RESUME -> {
-                    // Only unpause if a file is already loaded. If the surface was destroyed
-                    // and recreated (GPU context loss path), loadFile() will be called by
-                    // attachSurfaceInternal → surfaceReadyCallback, which unpauses itself.
-                    // This branch handles the common case where the surface is preserved.
-                    if (repository.fileLoaded.value) {
-                        repository.play()
-                    }
+                    // Do NOT call repository.play() here. Resuming audio before the surface is
+                    // reattached causes the "audio plays, black screen" bug. The full sequence
+                    // (reattachSurface → vo=gpu → play) is driven unconditionally by
+                    // resumeAfterSurfaceReattach() inside PlayerLifecycleEffect.
                 }
                 else -> {}
             }
