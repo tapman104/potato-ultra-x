@@ -38,11 +38,12 @@ private val AmoledDarkColorScheme = darkColorScheme(
 
 class MainActivity : ComponentActivity() {
     private var pendingIntent by mutableStateOf<Intent?>(null)
-    private var mpvEngine: MpvEngine? = null
-    private var playerRepository: PlayerRepository? = null
+    private val mpvEngine by lazy { MpvEngine(applicationContext) }
+    private val playerRepository by lazy { PlayerRepository(mpvEngine) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        mpvEngine.init()
         pendingIntent = intent
 
         // Set orientation before setContent to prevent portrait flash
@@ -61,19 +62,8 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(colorScheme = AmoledDarkColorScheme) {
                 val navController = rememberNavController()
 
-                // Engine lives for the entire activity lifetime
-                val engine = remember { MpvEngine(applicationContext) }
-                val repository = remember { PlayerRepository(engine) }
-                mpvEngine = engine
-                playerRepository = repository
-
-                DisposableEffect(Unit) {
-                    engine.init()
-                    onDispose { engine.destroy() }
-                }
-
-                val fileLoaded by repository.fileLoaded.collectAsState()
-                val isPaused by repository.isPaused.collectAsState()
+                val fileLoaded by playerRepository.fileLoaded.collectAsState()
+                val isPaused by playerRepository.isPaused.collectAsState()
 
                 DisposableEffect(fileLoaded, isPaused) {
                     if (fileLoaded && !isPaused) {
@@ -88,8 +78,8 @@ class MainActivity : ComponentActivity() {
 
                 AppNavigation(
                     navController = navController,
-                    engine        = engine,
-                    repository    = repository
+                    engine        = mpvEngine,
+                    repository    = playerRepository
                 )
 
                 LaunchedEffect(navController, pendingIntent) {
@@ -128,17 +118,20 @@ class MainActivity : ComponentActivity() {
             try {
                 contentResolver.openFileDescriptor(uri, "r")?.close()
             } catch (e: Exception) {
+                android.widget.Toast.makeText(this, "Cannot read file: ${e.localizedMessage}", android.widget.Toast.LENGTH_SHORT).show()
                 return // URI unreadable, bail
             }
         }
 
         val title = uri.lastPathSegment?.substringAfterLast('/') ?: ""
-        navController.navigate(PlayerRoute(videoUri = uri.toString(), title = title))
+        navController.navigate(PlayerRoute(videoUri = uri.toString(), title = title)) {
+            launchSingleTop = true
+        }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        mpvEngine?.surface?.isRotating?.set(true)
+        mpvEngine.surface.isRotating.set(true)
     }
 
     override fun onPause() {
@@ -146,11 +139,11 @@ class MainActivity : ComponentActivity() {
         // Don't pause playback when transitioning into PiP mode
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && isInPictureInPictureMode) return
         // Fix 5: route through the repository so isPaused StateFlow stays consistent.
-        playerRepository?.pause()
+        playerRepository.pause()
         // releaseForBackground() atomically clears isMpvRendering, detaches the surface, and
         // sets vo=null so the next resume always builds a fresh EGL context, even on devices
         // where surfaceDestroyed() never fires and the Surface object survives lock/background.
-        mpvEngine?.surface?.releaseForBackground()
+        mpvEngine.surface.releaseForBackground()
     }
 
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
@@ -159,14 +152,12 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handlePipModeChange(isInPip: Boolean) {
-        playerRepository?.setPipMode(isInPip)
-        mpvEngine?.let { engine ->
-            if (isInPip) {
-                engine.executor.play()
-                engine.surface.reattachSurface()
-            } else {
-                engine.surface.reattachSurface()
-            }
+        playerRepository.setPipMode(isInPip)
+        if (isInPip) {
+            mpvEngine.executor.play()
+            mpvEngine.surface.reattachSurface()
+        } else {
+            mpvEngine.surface.reattachSurface()
         }
     }
 
@@ -175,6 +166,7 @@ class MainActivity : ComponentActivity() {
         if (isFinishing) {
             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
+        mpvEngine.destroy()
     }
 }
 

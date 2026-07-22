@@ -1,14 +1,10 @@
 package com.potato.player
 
 import android.content.pm.ActivityInfo
-import android.net.Uri
+import android.os.Build
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -38,37 +34,6 @@ fun AppNavigation(
     engine: MpvEngine,
     repository: PlayerRepository
 ) {
-    val lifecycleOwner = LocalLifecycleOwner.current
-
-    // App-level lifecycle monitoring: pause MPV when app goes to background (onPause)
-    // and resume playback when returning (onResume) — guards against warm-resume black screen
-    // where the SurfaceView is preserved and surfaceChanged never fires to re-trigger loadFile.
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_PAUSE -> {
-                    if (!repository.isPaused.value) {
-                        repository.pause()
-                    }
-                    // releaseForBackground() clears isMpvRendering, detaches the surface, and
-                    // resets vo so the next resume always builds a fresh EGL context.
-                    engine.surface.releaseForBackground()
-                }
-                Lifecycle.Event.ON_RESUME -> {
-                    // Do NOT call repository.play() here. Resuming audio before the surface is
-                    // reattached causes the "audio plays, black screen" bug. The full sequence
-                    // (reattachSurface → vo=gpu → play) is driven unconditionally by
-                    // resumeAfterSurfaceReattach() inside PlayerLifecycleEffect.
-                }
-                else -> {}
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
-    }
-
     NavHost(
         navController = navController,
         startDestination = HomeRoute
@@ -88,6 +53,9 @@ fun AppNavigation(
             DisposableEffect(route.videoUri) {
                 onDispose {
                     repository.enterStandby()
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || activity?.isInPictureInPictureMode != true) {
+                        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                    }
                 }
             }
 
@@ -100,7 +68,6 @@ fun AppNavigation(
                 title     = route.title,
                 viewModel = playerViewModel,
                 onBack    = {
-                    activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                     navController.popBackStack()
                 }
             )
