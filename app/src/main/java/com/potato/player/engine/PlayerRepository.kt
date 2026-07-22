@@ -175,13 +175,16 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
             val count = engine.executor.getPropertyInt(MpvProp.TRACK_LIST_COUNT) ?: 0
             val list = mutableListOf<TrackInfo>()
             for (i in 0 until count) {
-                val type = engine.executor.getPropertyString("track-list/$i/type") ?: continue
-                if (type != "audio" && type != "sub") continue
+                val trackType = when (engine.executor.getPropertyString("track-list/$i/type")) {
+                    "audio" -> TrackType.AUDIO
+                    "sub"   -> TrackType.SUBTITLE
+                    else    -> continue
+                }
                 val id = engine.executor.getPropertyInt("track-list/$i/id") ?: continue
                 val title = engine.executor.getPropertyString("track-list/$i/title")
                 val lang = engine.executor.getPropertyString("track-list/$i/lang")
                 val extStr = engine.executor.getPropertyString("track-list/$i/external")
-                list.add(TrackInfo(id = id, type = type, title = title, lang = lang, isExternal = extStr == "yes" || extStr == "true"))
+                list.add(TrackInfo(id = id, type = trackType, title = title, lang = lang, isExternal = extStr == "yes" || extStr == "true"))
             }
             _tracks.value = list
             _currentAudioTrackId.value = engine.executor.getPropertyString(MpvProp.AID)?.toIntOrNull() ?: -1
@@ -198,21 +201,22 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
     fun onSliderDragEnd()   { isSliderSeeking = false }
     fun stop()              { engine.executor.stop() }
 
+    private fun saveHistoryIfNeeded() {
+        if (currentUri.isEmpty() || _durationSec.value <= 0.0) return
+        val entry = VideoHistory(
+            uri = currentUri,
+            title = currentTitle.ifEmpty { currentUri.substringAfterLast('/') },
+            lastPlayedPositionSec = _positionSec.value,
+            durationSec = _durationSec.value,
+            lastAudioTrackId = _currentAudioTrackId.value,
+            lastSubtitleTrackId = _currentSubtitleTrackId.value,
+            lastPlayedTimestamp = System.currentTimeMillis()
+        )
+        repoScope.launch(kotlinx.coroutines.Dispatchers.IO) { database.videoHistoryDao().upsert(entry) }
+    }
+
     fun enterStandby() {
-        if (currentUri.isNotEmpty() && _durationSec.value > 0.0) {
-            val historyEntry = VideoHistory(
-                uri = currentUri,
-                title = if (currentTitle.isNotEmpty()) currentTitle else currentUri.substringAfterLast('/'),
-                lastPlayedPositionSec = _positionSec.value,
-                durationSec = _durationSec.value,
-                lastAudioTrackId = _currentAudioTrackId.value,
-                lastSubtitleTrackId = _currentSubtitleTrackId.value,
-                lastPlayedTimestamp = System.currentTimeMillis()
-            )
-            repoScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                database.videoHistoryDao().upsert(historyEntry)
-            }
-        }
+        saveHistoryIfNeeded()
         engine.enterStandby()
         _fileLoaded.value = false; _isLoading.value = false; _isPaused.value = true
         _positionSec.value = 0.0; _durationSec.value = 0.0; _cachedSec.value = 0.0; _cacheDurationSec.value = 0.0
@@ -252,20 +256,7 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
         }
         _isFastForwarding.value = false
 
-        if (currentUri.isNotEmpty() && _durationSec.value > 0.0) {
-            val historyEntry = VideoHistory(
-                uri = currentUri,
-                title = if (currentTitle.isNotEmpty()) currentTitle else currentUri.substringAfterLast('/'),
-                lastPlayedPositionSec = _positionSec.value,
-                durationSec = _durationSec.value,
-                lastAudioTrackId = _currentAudioTrackId.value,
-                lastSubtitleTrackId = _currentSubtitleTrackId.value,
-                lastPlayedTimestamp = System.currentTimeMillis()
-            )
-            repoScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                database.videoHistoryDao().upsert(historyEntry)
-            }
-        }
+        saveHistoryIfNeeded()
     }
 
     override fun onPropertyChange(name: String, value: Any?) {

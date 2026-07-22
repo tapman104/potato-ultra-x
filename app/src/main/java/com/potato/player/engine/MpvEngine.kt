@@ -36,9 +36,9 @@ class MpvEngine(val context: Context) {
                 executor.setAlive(true)
 
                 // Re-assert cache caps post-init (some builds reset on init)
-                MPVLib.setPropertyString("demuxer-max-bytes",      "50MiB")
-                MPVLib.setPropertyString("demuxer-max-back-bytes", "20MiB")
-                MPVLib.setPropertyString("cache-secs",             "30")
+                MPVLib.setPropertyString("demuxer-max-bytes",      MpvCache.MAX_BYTES)
+                MPVLib.setPropertyString("demuxer-max-back-bytes", MpvCache.MAX_BACK_BYTES)
+                MPVLib.setPropertyString("cache-secs",             MpvCache.SECS)
 
                 configurator.postInitOptions()
                 MPVLib.addObserver(dispatcher)
@@ -65,11 +65,6 @@ class MpvEngine(val context: Context) {
         // timeout), so the listener is always removed exactly once — whoever wins the CAS owns
         // the cleanup. No unconditional pre-CAS remove needed; that would break the invariant.
         val listener = object : MpvEventListener {
-            override fun onFileLoaded() {}
-            override fun onPlaybackStarted() {}
-            override fun onPlaybackStopped(endReason: Int) {}
-            override fun onPropertyChange(name: String, value: Any?) {}
-            override fun onError(message: String) {}
             override fun onVideoReconfig() {
                 if (completed.compareAndSet(false, true)) {
                     dispatcher.removeListener(this)

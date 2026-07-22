@@ -41,9 +41,9 @@ class MpvOptionsConfigurator {
         MPVLib.setOptionString("hwdec-codecs", "all")
 
         // Cache — capped for mobile memory
-        MPVLib.setOptionString("demuxer-max-bytes",      "50MiB")
-        MPVLib.setOptionString("demuxer-max-back-bytes", "20MiB")
-        MPVLib.setOptionString("cache-secs",             "30")
+        MPVLib.setOptionString("demuxer-max-bytes",      MpvCache.MAX_BYTES)
+        MPVLib.setOptionString("demuxer-max-back-bytes", MpvCache.MAX_BACK_BYTES)
+        MPVLib.setOptionString("cache-secs",             MpvCache.SECS)
 
         // Logging — keep quiet in production
         MPVLib.setOptionString("msg-level", "all=warn")

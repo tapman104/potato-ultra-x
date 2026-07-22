@@ -6,13 +6,13 @@ import `is`.xyz.mpv.MPVNode
 import java.util.concurrent.CopyOnWriteArrayList
 
 interface MpvEventListener {
-    fun onFileLoaded()
-    fun onPlaybackStarted()
-    fun onPlaybackStopped(endReason: Int)
-    fun onPropertyChange(name: String, value: Any?)
-    fun onError(message: String)
-    fun onVideoReconfig() {}
-    fun onSeek() {}
+    fun onFileLoaded()                              {}
+    fun onPlaybackStarted()                         {}
+    fun onPlaybackStopped(endReason: Int)           {}
+    fun onPropertyChange(name: String, value: Any?) {}
+    fun onError(message: String)                    {}
+    fun onVideoReconfig()                           {}
+    fun onSeek()                                    {}
 }
 
 class MpvEventDispatcher : MPVLib.EventObserver {

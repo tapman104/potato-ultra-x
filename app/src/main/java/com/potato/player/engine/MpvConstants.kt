@@ -32,3 +32,9 @@ internal object MpvEvent {
     const val VIDEO_RECONFIG   = 17
     const val SEEK             = 20
 }
+
+internal object MpvCache {
+    const val MAX_BYTES      = "50MiB"
+    const val MAX_BACK_BYTES = "20MiB"
+    const val SECS           = "30"
+}
