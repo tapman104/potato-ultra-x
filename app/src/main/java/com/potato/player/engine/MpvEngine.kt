@@ -61,6 +61,9 @@ class MpvEngine(val context: Context) {
             return
         }
         val completed = AtomicBoolean(false)
+        // ponytail: removeListener is inside the CAS-success block in BOTH paths (event and
+        // timeout), so the listener is always removed exactly once — whoever wins the CAS owns
+        // the cleanup. No unconditional pre-CAS remove needed; that would break the invariant.
         val listener = object : MpvEventListener {
             override fun onFileLoaded() {}
             override fun onPlaybackStarted() {}

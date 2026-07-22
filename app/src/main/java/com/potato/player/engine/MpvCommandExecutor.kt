@@ -122,6 +122,11 @@ class MpvCommandExecutor {
             if (Thread.currentThread() == engineThread) {
                 MPVLib.getPropertyInt(name)
             } else {
+                // ponytail: block callers on Main before they deadlock the executor
+                if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+                    Log.e(TAG, "getPropertyInt($name) called on main thread — deadlock risk, returning null")
+                    return null
+                }
                 executor.submit<Int?> { if (isAlive()) MPVLib.getPropertyInt(name) else null }.get()
             }
         } catch (e: Exception) {
@@ -136,6 +141,11 @@ class MpvCommandExecutor {
             if (Thread.currentThread() == engineThread) {
                 MPVLib.getPropertyString(name)
             } else {
+                // ponytail: same deadlock guard as getPropertyInt
+                if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
+                    Log.e(TAG, "getPropertyString($name) called on main thread — deadlock risk, returning null")
+                    return null
+                }
                 executor.submit<String?> { if (isAlive()) MPVLib.getPropertyString(name) else null }.get()
             }
         } catch (e: Exception) {
