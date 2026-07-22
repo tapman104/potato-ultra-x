@@ -39,6 +39,7 @@ class MpvSurface(
     /** Called on every app-background / lock so the next ON_RESUME forces a full re-attach even
      *  on devices where the Surface object survives and surfaceCreated() never fires. */
     fun invalidateRenderState() { isMpvRendering.set(false) }
+    fun markRendering() { isMpvRendering.set(true) }
     /**
      * Called on app-background / lock. Clears isMpvRendering AND explicitly tears down
      * the GPU context so the next resume always performs a clean re-attach, regardless of
@@ -87,7 +88,7 @@ class MpvSurface(
         lastHolderSurface = holder.surface
         // Fix 3: only drive a full re-attach when MPV is not already mid-reattach.
         // Prevents a surface-generation race between this callback and ON_RESUME reattachSurface().
-        if (!isMpvRendering.get()) {
+        if (!isMpvRendering.get() && attachedSurface != holder.surface) {
             attachSurfaceInternal(holder.surface)
         }
         if (width > 0 && height > 0) {
@@ -151,26 +152,22 @@ class MpvSurface(
         executor.execute {
             if (!executor.isAlive()) return@execute
             if (executor.isCurrentSurfaceGeneration(gen)) {
-                // Force EGL context teardown before re-attach. Without this, MPV reuses
-                // the stale GPU context from the surviving Surface object and renders into the void.
-                //
-                // Rather than a fixed Thread.sleep, we register a one-shot VIDEO_RECONFIG
-                // listener and block on a CountDownLatch until MPV confirms vo=null has taken
-                // effect (same pattern used by MpvEngine.prepareDecoderSwitch). Falls through
-                // after 500 ms on slow/loaded devices so playback always recovers.
-                val latch = CountDownLatch(1)
-                val voNullListener = object : MpvEventListener {
-                    override fun onVideoReconfig() {
-                        dispatcher.removeListener(this)
-                        latch.countDown()
+                val currentVo = runCatching { MPVLib.getPropertyString("vo") }.getOrNull()
+                if (currentVo != "null") {
+                    // Force EGL context teardown before re-attach when vo is active.
+                    val latch = CountDownLatch(1)
+                    val voNullListener = object : MpvEventListener {
+                        override fun onVideoReconfig() {
+                            dispatcher.removeListener(this)
+                            latch.countDown()
+                        }
                     }
+                    dispatcher.addListener(voNullListener)
+                    runCatching { MPVLib.detachSurface() }
+                    runCatching { MPVLib.setPropertyString("vo", "null") }
+                    latch.await(500, TimeUnit.MILLISECONDS)
+                    dispatcher.removeListener(voNullListener)
                 }
-                dispatcher.addListener(voNullListener)
-                runCatching { MPVLib.detachSurface() }
-                runCatching { MPVLib.setPropertyString("vo", "null") }
-                // Block until VIDEO_RECONFIG fires or 500 ms elapses (safety timeout).
-                latch.await(500, TimeUnit.MILLISECONDS)
-                dispatcher.removeListener(voNullListener) // no-op if already removed on event
                 if (!executor.isCurrentSurfaceGeneration(gen)) return@execute // stale, bail
                 runCatching { MPVLib.attachSurface(s) }
                 runCatching { MPVLib.setOptionString("force-window", "yes") }
@@ -205,13 +202,10 @@ class MpvSurface(
                 runCatching { MPVLib.setPropertyString("vo", "gpu") }
                 pendingAttachSurface.set(null)
                 mainHandler.post {
+                    isMpvRendering.set(true)
                     when {
                         readyCb   != null -> readyCb()    // first load — call loadFile()
-                        reattachCb != null -> {            // resume — mark rendering live, then notify
-                            isMpvRendering.set(true)
-                            reattachCb()
-                        }
-                        // else: no callback registered yet; ON_RESUME guard in PlayerScreen covers this
+                        reattachCb != null -> reattachCb() // resume — notify
                     }
                 }
             } else {

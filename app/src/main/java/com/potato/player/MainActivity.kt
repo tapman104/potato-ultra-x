@@ -127,6 +127,7 @@ class MainActivity : ComponentActivity() {
         navController.navigate(PlayerRoute(videoUri = uri.toString(), title = title)) {
             launchSingleTop = true
         }
+        intent?.action = Intent.ACTION_MAIN
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {

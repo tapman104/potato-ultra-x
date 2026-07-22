@@ -37,13 +37,15 @@ fun HomeScreen(
     DisposableEffect(lifecycleOwner, activity) {
         val window = activity?.window
         val controller = window?.let { WindowInsetsControllerCompat(it, it.decorView) }
-        // Apply immediately so we don't wait for the next ON_RESUME
-        lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
-        controller?.show(WindowInsetsCompat.Type.systemBars())
+        fun applyPortrait() {
+            if (activity?.intent?.action == android.content.Intent.ACTION_VIEW) return
+            lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
+            controller?.show(WindowInsetsCompat.Type.systemBars())
+        }
+        applyPortrait()
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
-                controller?.show(WindowInsetsCompat.Type.systemBars())
+                applyPortrait()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)

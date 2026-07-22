@@ -129,24 +129,22 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
         sv.holder.addCallback(repository.engine.surface)
     }
 
-    fun onSurfaceReady(uri: String = currentUri, title: String = currentTitle) {
-        if (uri.isNotEmpty()) {
-            currentUri = uri
-            currentTitle = title
-        }
-        repository.engine.surface.setSurfaceReadyCallback {
-            viewModelScope.launch { repository.loadFile(currentUri, currentTitle) }
-        }
-        repository.engine.surface.setSurfaceReattachedCallback {
-            resumeAfterSurfaceReattach()
-        }
-        if (repository.engine.surface.hasAttachedSurface() && currentUri.isNotEmpty()) {
-            viewModelScope.launch { repository.loadFile(currentUri, currentTitle) }
-        }
+    fun onSurfaceReady(uri: String, title: String = "") {
+        currentUri = uri
+        currentTitle = title
+        repository.loadFile(uri, title)
     }
 
     fun onSurfaceReattached() {
         resumeAfterSurfaceReattach()
+    }
+
+    fun setSurfaceReadyCallback(cb: (() -> Unit)?) {
+        repository.engine.surface.setSurfaceReadyCallback(cb)
+    }
+
+    fun setSurfaceReattachedCallback(cb: (() -> Unit)?) {
+        repository.engine.surface.setSurfaceReattachedCallback(cb)
     }
 
     fun onSurfaceDestroyed() {

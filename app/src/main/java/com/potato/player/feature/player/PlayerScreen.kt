@@ -84,9 +84,11 @@ fun PlayerScreen(
 
     // Load the video once the surface is ready; also handles config-change re-attach.
     DisposableEffect(viewModel, videoUri) {
-        viewModel.onSurfaceReady(videoUri, title)
-        viewModel.onSurfaceReattached()
+        viewModel.setSurfaceReadyCallback { viewModel.onSurfaceReady(videoUri, title) }
+        viewModel.setSurfaceReattachedCallback { viewModel.onSurfaceReattached() }
         onDispose {
+            viewModel.setSurfaceReadyCallback(null)
+            viewModel.setSurfaceReattachedCallback(null)
             viewModel.onSurfaceDestroyed()
         }
     }
@@ -271,7 +273,6 @@ private fun PlayerLifecycleEffect(
     var hasSetAspectOrientation by remember { mutableStateOf(false) }
 
     fun updateOrientation() {
-        if (!uiState.fileLoaded) return
         if (uiState.isAutoRotation) {
             hasSetAspectOrientation = true
             lockOrientation(activity, ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR)

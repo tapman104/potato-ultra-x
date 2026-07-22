@@ -105,7 +105,10 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
             engine.executor.loadFile(uri)
         }
     }
-    fun togglePlay() { engine.executor.togglePlay() }
+    fun togglePlay() {
+        _isPaused.value = !_isPaused.value
+        engine.executor.togglePlay()
+    }
     fun play()       { engine.executor.play() }
     fun pause()      { engine.executor.pause() }
     fun setPipMode(isInPip: Boolean) { _isInPipMode.value = isInPip }
@@ -241,6 +244,9 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
     override fun onFileLoaded() { _fileLoaded.value = true; _isLoading.value = false; loadTracks() }
     override fun onPlaybackStarted() {
         _isLoading.value = false
+        _isPaused.value = false
+        engine.surface.markRendering()
+        engine.executor.play()
         // Both ops run sequentially on Main: flush first so no pending seek can overwrite
         // the resume position that fires immediately after.
         repoScope.launch {
