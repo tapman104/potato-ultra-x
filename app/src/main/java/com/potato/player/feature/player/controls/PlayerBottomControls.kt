@@ -18,12 +18,11 @@ import androidx.compose.ui.unit.sp
 import android.os.Build
 import com.potato.player.util.TimeFormatter
 
+import com.potato.player.feature.player.PlaybackProgressState
+
 @Composable
 fun PlayerBottomControls(
-    currentPositionMs: Long,
-    durationMs: Long,
-    cachedPositionMs: Long = 0L,
-    bufferDurationMs: Long = 0L,
+    progressState: PlaybackProgressState,
     isAutoRotation: Boolean = false,
     onSeekGesture: (Long) -> Unit,    // called continuously during drag
     onSeekCommit: (Long) -> Unit,     // called once on finger lift
@@ -33,6 +32,11 @@ fun PlayerBottomControls(
     onEnterPip: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val currentPositionMs = (progressState.positionSec * 1000.0).toLong()
+    val durationMs = (progressState.durationSec * 1000.0).toLong()
+    val cachedPositionMs = (progressState.cachedSec * 1000.0).toLong()
+    val bufferDurationMs = (progressState.cacheDurationSec * 1000.0).toLong()
+
     // dragFraction: -1f means "not dragging"; any >= 0f means actively scrubbing
     var dragFraction by remember { mutableFloatStateOf(-1f) }
 

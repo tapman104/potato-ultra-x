@@ -16,34 +16,35 @@ fun PlayerModals(
 ) {
     val context = LocalContext.current
 
-    if (uiState.activeSheet == ActiveSheet.DECODER) {
-        PlayerDecoderDialog(
-            currentDecoder = uiState.hwdecCurrent,
-            onSelectDecoder = { mode -> viewModel.setDecoder(mode) },
-            onDismiss = { viewModel.onDismissDecoderDialog() }
-        )
-    }
-
-    if (uiState.activeSheet == ActiveSheet.AUDIO) {
-        AudioTrackDialog(
-            tracks = uiState.tracks.filter { it.type == TrackType.AUDIO },
-            currentTrackId = uiState.currentAudioTrackId,
-            onSelectTrack = { viewModel.onSelectAudioTrack(it) },
-            onDismiss = { viewModel.onDismissAudioDialog() }
-        )
-    }
-
-    if (uiState.activeSheet == ActiveSheet.SUBTITLE) {
-        SubtitleTrackDialog(
-            tracks = uiState.tracks.filter { it.type == TrackType.SUBTITLE },
-            currentTrackId = uiState.currentSubtitleTrackId,
-            onSelectTrack = { viewModel.onSelectSubtitleTrack(it) },
-            onLoadExternal = { uri -> viewModel.onLoadExternalSubtitle(uri, context) },
-            onDismiss = { viewModel.onDismissSubtitleDialog() },
-            uiState = uiState,
-            onSetSubtitleAppearance = { scale, pos -> viewModel.setSubtitleAppearance(scale, pos) },
-            onResetSubtitleAppearance = { viewModel.resetSubtitleAppearance() }
-        )
+    when (uiState.activeSheet) {
+        ActiveSheet.DECODER -> {
+            PlayerDecoderDialog(
+                currentDecoder = uiState.hwdecCurrent,
+                onSelectDecoder = { mode -> viewModel.setDecoder(mode) },
+                onDismiss = { viewModel.onDismissDecoderDialog() }
+            )
+        }
+        ActiveSheet.AUDIO -> {
+            AudioTrackDialog(
+                tracks = uiState.tracks.filter { it.type == TrackType.AUDIO },
+                currentTrackId = uiState.currentAudioTrackId,
+                onSelectTrack = { viewModel.onSelectAudioTrack(it) },
+                onDismiss = { viewModel.onDismissAudioDialog() }
+            )
+        }
+        ActiveSheet.SUBTITLE -> {
+            SubtitleTrackDialog(
+                tracks = uiState.tracks.filter { it.type == TrackType.SUBTITLE },
+                currentTrackId = uiState.currentSubtitleTrackId,
+                onSelectTrack = { viewModel.onSelectSubtitleTrack(it) },
+                onLoadExternal = { uri -> viewModel.onLoadExternalSubtitle(uri, context) },
+                onDismiss = { viewModel.onDismissSubtitleDialog() },
+                uiState = uiState,
+                onSetSubtitleAppearance = { scale, pos -> viewModel.setSubtitleAppearance(scale, pos) },
+                onResetSubtitleAppearance = { viewModel.resetSubtitleAppearance() }
+            )
+        }
+        else -> Unit
     }
 
     // ponytail: gate sheet on fileLoaded so it never appears on an empty player

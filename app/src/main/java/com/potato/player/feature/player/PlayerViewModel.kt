@@ -2,16 +2,19 @@ package com.potato.player.feature.player
 
 import android.content.Context
 import android.net.Uri
+import android.view.SurfaceView
+import android.view.View
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.potato.player.data.UserPreferencesRepository
-import com.potato.player.engine.MpvSurface
 import com.potato.player.engine.PlayerRepository
 import com.potato.player.engine.TrackInfo
 import com.potato.player.util.MediaMetadataRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -20,16 +23,95 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
     private val prefsRepository by lazy { UserPreferencesRepository(repository.engine.context) }
 
     private val _uiState = MutableStateFlow(PlayerUiState())
-    val uiState: StateFlow<PlayerUiState> = _uiState
+    val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
 
-    // Expose surface directly so PlayerScreen can register SurfaceHolder.Callback
-    val surface: MpvSurface get() = repository.engine.surface
+    private val _progressState = MutableStateFlow(PlaybackProgressState())
+    val progressState: StateFlow<PlaybackProgressState> = _progressState.asStateFlow()
+
+    private var currentUri = ""
+    private var currentTitle = ""
 
     init {
-        viewModelScope.launch { prefsRepository.subScaleFlow.collect { repository.setSubScale(it) } }
-        viewModelScope.launch { prefsRepository.subPosFlow.collect { repository.setSubPos(it) } }
-        viewModelScope.launch { prefsRepository.autoRotationFlow.collect { v -> _uiState.update { it.copy(isAutoRotation = v) } } }
-        viewModelScope.launch { repository.isInPipMode.collect { v -> _uiState.update { it.copy(isInPipMode = v) } } }
+        // [A1] combine high-frequency progress flows into progressState
+        viewModelScope.launch {
+            combine(
+                repository.positionSec,
+                repository.durationSec,
+                repository.cachedSec,
+                repository.cacheDurationSec
+            ) { pos, dur, cached, cacheDur ->
+                _progressState.update {
+                    it.copy(
+                        positionSec = pos,
+                        durationSec = dur,
+                        cachedSec = cached,
+                        cacheDurationSec = cacheDur
+                    )
+                }
+            }.collect {}
+        }
+
+        // [A2] group tracks and track selections
+        viewModelScope.launch {
+            combine(repository.tracks, repository.currentAudioTrackId, repository.currentSubtitleTrackId) { tracks, audioId, subId ->
+                Triple(tracks, audioId, subId)
+            }.collect { (tracks, audioId, subId) ->
+                _uiState.update { it.copy(tracks = tracks, currentAudioTrackId = audioId, currentSubtitleTrackId = subId) }
+            }
+        }
+
+        // [A2] group playback control and speed states
+        viewModelScope.launch {
+            combine(repository.isPaused, repository.playbackSpeed, repository.isFastForwarding) { paused, speed, ff ->
+                Triple(paused, speed, ff)
+            }.collect { (paused, speed, ff) ->
+                _uiState.update { it.copy(isPlaying = !paused, playbackSpeed = speed, isFastForwarding = ff) }
+            }
+        }
+
+        // [A2] group file loading states
+        viewModelScope.launch {
+            combine(repository.fileLoaded, repository.isLoading) { loaded, loading ->
+                Pair(loaded, loading)
+            }.collect { (loaded, loading) ->
+                _uiState.update { it.copy(fileLoaded = loaded, isLoading = loading) }
+            }
+        }
+
+        // [A2] group subtitle appearance states
+        viewModelScope.launch {
+            combine(repository.subScale, repository.subPos) { scale, pos ->
+                Pair(scale, pos)
+            }.collect { (scale, pos) ->
+                _uiState.update { it.copy(subScale = scale, subPos = pos) }
+            }
+        }
+
+        // [A2] group video parameters and display properties
+        viewModelScope.launch {
+            combine(
+                repository.videoWidth,
+                repository.videoHeight,
+                repository.isInPipMode,
+                repository.hwdecCurrent
+            ) { w, h, pip, hwdec ->
+                _uiState.update { it.copy(videoWidth = w, videoHeight = h, isInPipMode = pip, hwdecCurrent = hwdec) }
+            }.collect {}
+        }
+
+        // [A2] combine preference syncs
+        viewModelScope.launch {
+            combine(prefsRepository.subScaleFlow, prefsRepository.subPosFlow) { scale, pos ->
+                repository.setSubScale(scale)
+                repository.setSubPos(pos)
+            }.collect {}
+        }
+
+        viewModelScope.launch {
+            prefsRepository.autoRotationFlow.collect { v -> _uiState.update { it.copy(isAutoRotation = v) } }
+        }
+
+        // ponytail: initResult has unique error/lifecycle side effects so kept separate
         viewModelScope.launch {
             repository.initResult.collect { result ->
                 if (result.isSuccess) {
@@ -40,26 +122,43 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
                 }
             }
         }
-        viewModelScope.launch { repository.isPaused.collect     { v -> _uiState.update { it.copy(isPlaying = !v) } } }
-        viewModelScope.launch { repository.positionSec.collect  { v -> _uiState.update { it.copy(positionSec = v) } } }
-        viewModelScope.launch { repository.durationSec.collect  { v -> _uiState.update { it.copy(durationSec = v) } } }
-        viewModelScope.launch { repository.cachedSec.collect    { v -> _uiState.update { it.copy(cachedSec = v) } } }
-        viewModelScope.launch { repository.cacheDurationSec.collect { v -> _uiState.update { it.copy(cacheDurationSec = v) } } }
-        viewModelScope.launch { repository.playbackSpeed.collect { v -> _uiState.update { it.copy(playbackSpeed = v) } } }
-        viewModelScope.launch { repository.isFastForwarding.collect { v -> _uiState.update { it.copy(isFastForwarding = v) } } }
-        viewModelScope.launch { repository.fileLoaded.collect   { v -> _uiState.update { it.copy(fileLoaded = v) } } }
-        viewModelScope.launch { repository.isLoading.collect    { v -> _uiState.update { it.copy(isLoading = v) } } }
-        viewModelScope.launch { repository.hwdecCurrent.collect { v -> _uiState.update { it.copy(hwdecCurrent = v) } } }
-        viewModelScope.launch { repository.tracks.collect       { v -> _uiState.update { it.copy(tracks = v) } } }
-        viewModelScope.launch { repository.currentAudioTrackId.collect { v -> _uiState.update { it.copy(currentAudioTrackId = v) } } }
-        viewModelScope.launch { repository.currentSubtitleTrackId.collect { v -> _uiState.update { it.copy(currentSubtitleTrackId = v) } } }
-        viewModelScope.launch { repository.subScale.collect { v -> _uiState.update { it.copy(subScale = v) } } }
-        viewModelScope.launch { repository.subPos.collect   { v -> _uiState.update { it.copy(subPos = v) } } }
-        viewModelScope.launch { repository.videoWidth.collect  { v -> _uiState.update { it.copy(videoWidth = v) } } }
-        viewModelScope.launch { repository.videoHeight.collect { v -> _uiState.update { it.copy(videoHeight = v) } } }
     }
 
-    fun loadFile(uri: String, title: String = "") { repository.loadFile(uri, title) }
+    fun createSurfaceView(context: Context): View = SurfaceView(context).also { sv ->
+        sv.keepScreenOn = true
+        sv.holder.addCallback(repository.engine.surface)
+    }
+
+    fun onSurfaceReady(uri: String = currentUri, title: String = currentTitle) {
+        if (uri.isNotEmpty()) {
+            currentUri = uri
+            currentTitle = title
+        }
+        repository.engine.surface.setSurfaceReadyCallback {
+            viewModelScope.launch { repository.loadFile(currentUri, currentTitle) }
+        }
+        repository.engine.surface.setSurfaceReattachedCallback {
+            resumeAfterSurfaceReattach()
+        }
+        if (repository.engine.surface.hasAttachedSurface() && currentUri.isNotEmpty()) {
+            viewModelScope.launch { repository.loadFile(currentUri, currentTitle) }
+        }
+    }
+
+    fun onSurfaceReattached() {
+        resumeAfterSurfaceReattach()
+    }
+
+    fun onSurfaceDestroyed() {
+        repository.engine.surface.setSurfaceReadyCallback(null)
+        repository.engine.surface.setSurfaceReattachedCallback(null)
+    }
+
+    fun loadFile(uri: String, title: String = "") {
+        currentUri = uri
+        currentTitle = title
+        repository.loadFile(uri, title)
+    }
 
     /**
      * Called when the SurfaceView is re-created after the app returns from Recents.
@@ -116,18 +215,18 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
 
     fun onSliderDragStart(posSec: Double) {
         repository.onSliderDragStart()
-        _uiState.update { it.copy(dragPositionSec = posSec) }
+        _progressState.update { it.copy(dragPositionSec = posSec) }
     }
 
     fun onSliderDragChange(posSec: Double) {
-        _uiState.update { it.copy(dragPositionSec = posSec) }
+        _progressState.update { it.copy(dragPositionSec = posSec) }
         repository.seekGesture(posSec)
     }
 
     fun onSliderDragEnd(posSec: Double) {
         repository.seekCommit(posSec)
         repository.onSliderDragEnd()
-        _uiState.update { it.copy(dragPositionSec = null) }
+        _progressState.update { it.copy(dragPositionSec = null) }
     }
 
     fun onMoreMenuToggle() {
@@ -209,11 +308,11 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
     }
 
     fun resetSubtitleAppearance() {
-        repository.setSubScale(1.0)
-        repository.setSubPos(100)
+        repository.setSubScale(PlayerUiConstants.DEFAULT_SUBTITLE_SCALE)
+        repository.setSubPos(PlayerUiConstants.DEFAULT_SUBTITLE_POSITION)
         viewModelScope.launch {
-            prefsRepository.setSubScale(1.0)
-            prefsRepository.setSubPos(100)
+            prefsRepository.setSubScale(PlayerUiConstants.DEFAULT_SUBTITLE_SCALE)
+            prefsRepository.setSubPos(PlayerUiConstants.DEFAULT_SUBTITLE_POSITION)
         }
     }
 

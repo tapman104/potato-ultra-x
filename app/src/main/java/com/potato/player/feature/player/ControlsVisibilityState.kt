@@ -32,7 +32,7 @@ fun rememberControlsVisibilityState(
     isPlaying: Boolean,
     dragPositionSec: Double?,
     isInPipMode: Boolean,
-    hideDelayMs: Long = 4000L
+    hideDelayMs: Long = PlayerUiConstants.CONTROLS_HIDE_DELAY_MS
 ): ControlsVisibilityState {
     val state = remember { ControlsVisibilityState() }
 

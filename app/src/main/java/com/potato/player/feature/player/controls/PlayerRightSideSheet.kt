@@ -1,6 +1,7 @@
 package com.potato.player.feature.player.controls
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
@@ -33,19 +34,20 @@ fun PlayerRightSideSheet(
     modifier: Modifier = Modifier
 ) {
     val accentColor = Color(0xFF90CAF9)
+    val scrimAlpha by animateFloatAsState(
+        targetValue = if (visible) 0.45f else 0f,
+        label = "scrimAlpha"
+    )
 
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(),
-        exit = fadeOut(),
-        modifier = modifier.fillMaxSize()
-    ) {
+    if (visible || scrimAlpha > 0f) {
         Box(
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.45f))
-                .pointerInput(Unit) {
-                    detectTapGestures(onTap = { _ -> onDismiss() })
+                .background(Color.Black.copy(alpha = scrimAlpha))
+                .pointerInput(visible) {
+                    if (visible) {
+                        detectTapGestures(onTap = { _ -> onDismiss() })
+                    }
                 }
         ) {
             AnimatedVisibility(

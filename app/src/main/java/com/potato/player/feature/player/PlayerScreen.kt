@@ -1,6 +1,5 @@
 package com.potato.player.feature.player
 
-import android.view.SurfaceView
 import android.os.Build
 import android.app.PictureInPictureParams
 import androidx.compose.animation.*
@@ -52,6 +51,7 @@ fun PlayerScreen(
 ) {
     BackHandler { onBack() }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val progressState by viewModel.progressState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
 
@@ -68,7 +68,7 @@ fun PlayerScreen(
 
     val controlsState = rememberControlsVisibilityState(
         isPlaying = uiState.isPlaying,
-        dragPositionSec = uiState.dragPositionSec,
+        dragPositionSec = progressState.dragPositionSec,
         isInPipMode = uiState.isInPipMode
     )
     var doubleTapSeekState by remember { mutableStateOf<DoubleTapSeekState?>(null) }
@@ -77,33 +77,17 @@ fun PlayerScreen(
     // Clear double-tap seek overlay after animation
     LaunchedEffect(doubleTapSeekState?.triggerId) {
         if (doubleTapSeekState != null) {
-            delay(800L)
+            delay(PlayerUiConstants.DOUBLE_TAP_OVERLAY_CLEAR_MS)
             doubleTapSeekState = null
         }
     }
 
-    // Clean up both surface callbacks when composable leaves composition
-    DisposableEffect(Unit) {
-        onDispose {
-            viewModel.surface.setSurfaceReadyCallback(null)
-            viewModel.surface.setSurfaceReattachedCallback(null)
-        }
-    }
-
     // Load the video once the surface is ready; also handles config-change re-attach.
-    // Bug fix: use hasAttachedSurface() (not hasSurface()) so we only fire the
-    // immediate path when the surface is truly attached — prevents double-loadFile
-    // when pendingAttachSurface is set but attachedSurface is still null.
-    LaunchedEffect(videoUri) {
-        viewModel.surface.setSurfaceReadyCallback {
-            viewModel.loadFile(videoUri, title)
-        }
-        // Resume path: re-attach surface on return from Recents without restarting the file.
-        viewModel.surface.setSurfaceReattachedCallback {
-            viewModel.resumeAfterSurfaceReattach()
-        }
-        if (viewModel.surface.hasAttachedSurface()) {
-            viewModel.loadFile(videoUri, title)
+    DisposableEffect(viewModel, videoUri) {
+        viewModel.onSurfaceReady(videoUri, title)
+        viewModel.onSurfaceReattached()
+        onDispose {
+            viewModel.onSurfaceDestroyed()
         }
     }
 
@@ -115,12 +99,7 @@ fun PlayerScreen(
 
         // ── Video surface ────────────────────────────────────────────────────
         AndroidView(
-            factory = { ctx ->
-                SurfaceView(ctx).also { sv ->
-                    sv.keepScreenOn = true
-                    sv.holder.addCallback(viewModel.surface)
-                }
-            },
+            factory = { ctx -> viewModel.createSurfaceView(ctx) },
             modifier = Modifier.fillMaxSize()
         )
 
@@ -146,16 +125,16 @@ fun PlayerScreen(
                             val current = doubleTapSeekState // ponytail: one snapshot variable eliminates the crash
                             val screenWidth = size.width
                             if (offset.x < screenWidth / 2f) {
-                                viewModel.seekExactRelative(-10)
+                                viewModel.seekExactRelative(-PlayerUiConstants.DOUBLE_TAP_SEEK_SECONDS)
                                 val accum = if (current != null && !current.isForward) {
-                                    current.totalSeconds + 10
-                                } else 10
+                                    current.totalSeconds + PlayerUiConstants.DOUBLE_TAP_SEEK_SECONDS
+                                } else PlayerUiConstants.DOUBLE_TAP_SEEK_SECONDS
                                 doubleTapSeekState = DoubleTapSeekState(isForward = false, totalSeconds = accum)
                             } else {
-                                viewModel.seekExactRelative(10)
+                                viewModel.seekExactRelative(PlayerUiConstants.DOUBLE_TAP_SEEK_SECONDS)
                                 val accum = if (current != null && current.isForward) {
-                                    current.totalSeconds + 10
-                                } else 10
+                                    current.totalSeconds + PlayerUiConstants.DOUBLE_TAP_SEEK_SECONDS
+                                } else PlayerUiConstants.DOUBLE_TAP_SEEK_SECONDS
                                 doubleTapSeekState = DoubleTapSeekState(isForward = true, totalSeconds = accum)
                             }
                         },
@@ -163,19 +142,6 @@ fun PlayerScreen(
                             controlsState.toggle()
                         }
                     )
-                }
-                .pointerInput(uiState.isInPipMode) {
-                    if (uiState.isInPipMode) return@pointerInput
-                    awaitEachGesture {
-                        awaitFirstDown(requireUnconsumed = false)
-                        do {
-                            val event = awaitPointerEvent()
-                        } while (event.changes.any { it.pressed })
-                        if (isLongPressActive) {
-                            isLongPressActive = false
-                            viewModel.stopFastForward()
-                        }
-                    }
                 }
         )
 
@@ -266,15 +232,11 @@ fun PlayerScreen(
                     .navigationBarsPadding()
             ) {
                 PlayerBottomControls(
-                    // ViewModel stores seconds; controls work in milliseconds
-                    currentPositionMs = (uiState.positionSec * 1000.0).toLong(),
-                    durationMs        = (uiState.durationSec * 1000.0).toLong(),
-                    cachedPositionMs  = (uiState.cachedSec * 1000.0).toLong(),
-                    bufferDurationMs  = (uiState.cacheDurationSec * 1000.0).toLong(),
+                    progressState     = progressState,
                     isAutoRotation    = uiState.isAutoRotation,
                     onSeekGesture     = { ms -> viewModel.onSliderDragChange(ms / 1000.0) },
                     onSeekCommit      = { ms -> viewModel.onSliderDragEnd(ms / 1000.0) },
-                    onDragStart       = { viewModel.onSliderDragStart(uiState.positionSec) },
+                    onDragStart       = { viewModel.onSliderDragStart(progressState.positionSec) },
                     onDragEnd         = { /* already handled inside onSeekCommit path */ },
                     onToggleAutoRotation = { viewModel.toggleAutoRotation() },
                     onEnterPip        = {
@@ -362,7 +324,7 @@ private fun PlayerLifecycleEffect(
                 // resumeAfterSurfaceReattach() was never called even though the EGL context
                 // had been invalidated by the display driver.
                 if (uiState.fileLoaded) {
-                    viewModel.resumeAfterSurfaceReattach()
+                    viewModel.onSurfaceReattached()
                 }
             }
         }
@@ -371,7 +333,9 @@ private fun PlayerLifecycleEffect(
         updateOrientation()
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            controller?.show(WindowInsetsCompat.Type.systemBars())
+            if (activity?.isInPictureInPictureMode == false) {
+                controller?.show(WindowInsetsCompat.Type.systemBars())
+            }
         }
     }
 
