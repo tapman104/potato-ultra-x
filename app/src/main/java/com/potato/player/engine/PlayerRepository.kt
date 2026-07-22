@@ -240,12 +240,14 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
     override fun onFileLoaded() { _fileLoaded.value = true; _isLoading.value = false; loadTracks() }
     override fun onPlaybackStarted() {
         _isLoading.value = false
-        // ponytail: dispatch to Main so flushPendingSeeks() compound ops on isSeekingGate /
-        // lastSeekTime / seekDebounceJob are always on the same thread as seekCommit().
-        repoScope.launch { flushPendingSeeks() }
-        if (resumePositionSec > 0.0 && !hasSoughtOnStart) {
-            hasSoughtOnStart = true
-            engine.executor.seekCommit(resumePositionSec)
+        // Both ops run sequentially on Main: flush first so no pending seek can overwrite
+        // the resume position that fires immediately after.
+        repoScope.launch {
+            flushPendingSeeks()
+            if (resumePositionSec > 0.0 && !hasSoughtOnStart) {
+                hasSoughtOnStart = true
+                engine.executor.seekCommit(resumePositionSec)
+            }
         }
     }
     override fun onSeek() { repoScope.launch { flushPendingSeeks() } }
