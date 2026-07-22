@@ -24,6 +24,7 @@ class MpvCommandExecutor {
 
     fun execute(action: () -> Unit) {
         if (!executor.isShutdown) executor.submit(action)
+        else Log.d(TAG, "execute skipped — executor is shut down")
     }
 
     fun nextSurfaceGeneration(): Int = surfaceGeneration.incrementAndGet()

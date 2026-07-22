@@ -56,6 +56,7 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
 
     init { engine.dispatcher.addListener(this) }
 
+    // ponytail: direct state check preserves instant fast-path on initial seek and integer offset accumulation without complex Flow boilerplate.
     private fun flushPendingSeeks() {
         val now = System.currentTimeMillis()
         if (now - lastSeekTime < 80) {

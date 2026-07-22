@@ -18,6 +18,7 @@ internal object MpvProp {
     const val VIDEO_PARAMS_H     = "video-params/h"
 }
 
+// ponytail: values correspond directly to mpv_format C enum in mpv/client.h
 internal object MpvFmt {
     const val FLAG   = 3
     const val STRING = 4

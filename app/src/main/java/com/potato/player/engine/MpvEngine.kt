@@ -8,7 +8,9 @@ import kotlinx.coroutines.flow.SharedFlow
 import java.util.concurrent.atomic.AtomicBoolean
 
 
-class MpvEngine(val context: Context) {
+class MpvEngine(context: Context) {
+    // ponytail: store applicationContext so passing an Activity never leaks
+    val context: Context = context.applicationContext
 
     val executor     = MpvCommandExecutor()
     val dispatcher   = MpvEventDispatcher()
