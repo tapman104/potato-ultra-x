@@ -62,34 +62,14 @@ class MpvEngine(context: Context) {
             onReady()
             return
         }
-        val completed = AtomicBoolean(false)
-        // ponytail: removeListener is inside the CAS-success block in BOTH paths (event and
-        // timeout), so the listener is always removed exactly once — whoever wins the CAS owns
-        // the cleanup. No unconditional pre-CAS remove needed; that would break the invariant.
-        val listener = object : MpvEventListener {
-            override fun onVideoReconfig() {
-                if (completed.compareAndSet(false, true)) {
-                    dispatcher.removeListener(this)
-                    onReady()
-                    surface.reattachSurface()
-                }
-            }
-        }
-        dispatcher.addListener(listener)
         surface.detachAndDisableVo()
-        android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-            if (completed.compareAndSet(false, true)) {
-                dispatcher.removeListener(listener)
-                onReady()
-                surface.reattachSurface()
-            }
-        }, 300)
+        onReady()
+        surface.reattachSurface()
     }
 
     fun enterStandby() {
         if (!initialized.get() || !executor.isAlive()) return
         Log.d(TAG, "enterStandby")
-        surface.setSurfaceReadyCallback(null)
         surface.detachAndDisableVo()
         executor.execute {
             if (!executor.isAlive()) return@execute
