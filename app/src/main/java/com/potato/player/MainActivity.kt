@@ -133,18 +133,6 @@ class MainActivity : ComponentActivity() {
         mpvEngine.surface.releaseForBackground()
     }
 
-    override fun onResume() {
-        super.onResume()
-        // On devices where surfaceDestroyed/surfaceCreated don't fire across lock/background
-        // (the Surface object survives), onPause's releaseForBackground() will have detached
-        // the surface but nothing will reattach it — permanent black screen.
-        // Guard: only reattach if a file is actually loaded so we don't reattach on cold start.
-        if (mpvEngine.surface.isMpvRendering.get() || playerRepository.fileLoaded.value) {
-            mpvEngine.surface.releaseForBackground()
-            mpvEngine.surface.reattachSurface()
-        }
-    }
-
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
         handlePipModeChange(isInPictureInPictureMode)
