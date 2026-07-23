@@ -93,13 +93,6 @@ class MpvCommandExecutor {
         }
     }
 
-    fun setDecoder(hwdec: String) {
-        execute {
-            if (!isAlive()) return@execute
-            Log.d(TAG, "setDecoder: $hwdec")
-            MPVLib.setPropertyString("hwdec", hwdec)
-        }
-    }
 
     fun setPlaybackSpeed(speed: Double) {
         execute {

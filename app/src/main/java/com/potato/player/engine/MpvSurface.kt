@@ -17,7 +17,7 @@ class MpvSurface(
     val isRotating = AtomicBoolean(false)
     private var surfaceReadyCallback: (() -> Unit)? = null
     @Volatile private var onSurfaceReattached: (() -> Unit)? = null
-    private var lastHolderSurface: Surface? = null
+    @Volatile private var lastHolderSurface: Surface? = null
 
     fun setSurfaceReadyCallback(cb: (() -> Unit)?) {
         surfaceReadyCallback = cb
