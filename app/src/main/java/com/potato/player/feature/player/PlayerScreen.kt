@@ -316,14 +316,10 @@ private fun PlayerLifecycleEffect(
             if (event == Lifecycle.Event.ON_RESUME) {
                 applyInsets()
                 updateOrientation()
-                // Always call resumeAfterSurfaceReattach() on resume when a file is loaded.
-                // reattachSurface() is idempotent (guarded by isMpvRendering + attachedSurface
-                // identity check), so this is safe to call even when MPV is already rendering.
-                // Removing the old hasAttachedSurface() guard fixes the black screen on devices
-                // where the Surface Java object survives lock/unlock and surfaceCreated() never
-                // fires — in that case attachedSurface was non-null, the guard was false, and
-                // resumeAfterSurfaceReattach() was never called even though the EGL context
-                // had been invalidated by the display driver.
+                // We notify the engine to reattach the surface on resume.
+                // The new simple attach sequence in MpvSurface will safely tear down the old 
+                // context and rebuild it, ensuring the GPU context is fully restored even on 
+                // OEM devices where the Surface object survives lock/background.
                 if (uiState.fileLoaded) {
                     viewModel.onSurfaceReattached()
                 }

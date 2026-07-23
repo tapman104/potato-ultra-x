@@ -141,9 +141,9 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && isInPictureInPictureMode) return
         // Fix 5: route through the repository so isPaused StateFlow stays consistent.
         playerRepository.pause()
-        // releaseForBackground() atomically clears isMpvRendering, detaches the surface, and
-        // sets vo=null so the next resume always builds a fresh EGL context, even on devices
-        // where surfaceDestroyed() never fires and the Surface object survives lock/background.
+        // releaseForBackground() detaches the surface and sets vo=null so the next resume 
+        // always builds a fresh EGL context, even on devices where surfaceDestroyed() 
+        // never fires and the Surface object survives lock/background.
         mpvEngine.surface.releaseForBackground()
     }
 
