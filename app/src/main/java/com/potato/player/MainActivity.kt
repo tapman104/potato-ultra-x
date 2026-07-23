@@ -13,8 +13,6 @@ import android.content.ContentResolver
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
-import android.view.WindowManager
-import androidx.compose.runtime.collectAsState
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
 import com.potato.player.engine.MpvEngine
@@ -62,19 +60,7 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(colorScheme = AmoledDarkColorScheme) {
                 val navController = rememberNavController()
 
-                val fileLoaded by playerRepository.fileLoaded.collectAsState()
-                val isPaused by playerRepository.isPaused.collectAsState()
 
-                DisposableEffect(fileLoaded, isPaused) {
-                    if (fileLoaded && !isPaused) {
-                        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                    } else {
-                        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                    }
-                    onDispose {
-                        window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-                    }
-                }
 
                 AppNavigation(
                     navController = navController,

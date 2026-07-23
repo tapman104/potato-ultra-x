@@ -188,6 +188,7 @@ fun PlayerScreen(
                 exit = fadeOut() + slideOutVertically { -it },
                 modifier = Modifier
                     .align(Alignment.TopCenter)
+                    .systemBarsPadding()
                     .windowInsetsPadding(WindowInsets.displayCutout)
             ) {
                 PlayerTopBar(
@@ -230,8 +231,8 @@ fun PlayerScreen(
                 exit = fadeOut() + slideOutVertically { it },
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
+                    .systemBarsPadding()
                     .windowInsetsPadding(WindowInsets.displayCutout)
-                    .navigationBarsPadding()
             ) {
                 PlayerBottomControls(
                     progressState     = progressState,
@@ -303,18 +304,18 @@ private fun PlayerLifecycleEffect(
         }
     }
 
-    DisposableEffect(lifecycleOwner, activity) {
+    val view = androidx.compose.ui.platform.LocalView.current
+    DisposableEffect(lifecycleOwner, activity, view) {
         val window = activity?.window
-        val controller = window?.let { WindowInsetsControllerCompat(it, it.decorView) }
-        fun applyInsets() {
-            controller?.apply {
-                hide(WindowInsetsCompat.Type.systemBars())
-                systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            }
+        if (window != null) {
+            androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+            val controller = androidx.core.view.WindowCompat.getInsetsController(window, view)
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(WindowInsetsCompat.Type.systemBars())
         }
+
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                applyInsets()
                 updateOrientation()
                 // We notify the engine to reattach the surface on resume.
                 // The new simple attach sequence in MpvSurface will safely tear down the old 
@@ -326,12 +327,13 @@ private fun PlayerLifecycleEffect(
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        applyInsets()
         updateOrientation()
+        
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            if (activity?.isInPictureInPictureMode == false) {
-                controller?.show(WindowInsetsCompat.Type.systemBars())
+            if (activity?.isInPictureInPictureMode == false && window != null) {
+                val controller = androidx.core.view.WindowCompat.getInsetsController(window, view)
+                controller.show(WindowInsetsCompat.Type.systemBars())
             }
         }
     }
