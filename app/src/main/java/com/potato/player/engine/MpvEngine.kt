@@ -58,13 +58,18 @@ class MpvEngine(context: Context) {
     }
 
     fun prepareDecoderSwitch(onReady: () -> Unit) {
-        if (!initialized.get() || !executor.isAlive()) {
-            onReady()
-            return
-        }
-        surface.detachAndDisableVo()
+        // All supported decoders (no / mediacodec / mediacodec-copy) run under vo=gpu,
+        // so hwdec switches are transparent to the video output — MPV reinitialises the
+        // decoder on its own decode cycle without touching the surface.
+        //
+        // The previous detach+reattach dance caused a permanent black screen:
+        //   detachAndDisableVo(), onReady() (setDecoder), and reattachSurface() were
+        //   posted as three independent async tasks.  The latch in attachSequence fired
+        //   on the VO-teardown VIDEO_RECONFIG (already consumed before the listener was
+        //   even registered), then set vo=gpu — only for MPV's decoder-switch reconfig
+        //   to fire immediately after and orphan the surface with vo=null while audio
+        //   (running on an independent ao pipeline) stayed alive.
         onReady()
-        surface.reattachSurface()
     }
 
     fun enterStandby() {
