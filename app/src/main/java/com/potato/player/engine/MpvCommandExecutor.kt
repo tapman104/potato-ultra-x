@@ -15,7 +15,7 @@ class MpvCommandExecutor {
         Thread(r, "mpv-engine-thread").also { engineThread = it }
     }
 
-    private val surfaceGeneration = AtomicInteger(0)
+
     private val pendingSeek       = AtomicReference<Double?>(null)
     private val _isAlive          = AtomicBoolean(false)
 
@@ -27,21 +27,13 @@ class MpvCommandExecutor {
         else Log.d(TAG, "execute skipped — executor is shut down")
     }
 
-    fun nextSurfaceGeneration(): Int = surfaceGeneration.incrementAndGet()
-    fun isCurrentSurfaceGeneration(gen: Int): Boolean = surfaceGeneration.get() == gen
-
     fun detachSurface() {
-        val capturedGen = surfaceGeneration.incrementAndGet()
         execute {
             if (!isAlive()) return@execute
-            if (surfaceGeneration.get() == capturedGen) {
-                Log.d(TAG, "detachSurface gen=$capturedGen")
-                runCatching { MPVLib.detachSurface() }
-                runCatching { MPVLib.setPropertyString("vo", "null") }
-                runCatching { MPVLib.setPropertyString("force-window", "no") }
-            } else {
-                Log.d(TAG, "detachSurface skipped — stale gen=$capturedGen")
-            }
+            Log.d(TAG, "detachSurface")
+            runCatching { MPVLib.detachSurface() }
+            runCatching { MPVLib.setPropertyString("vo", "null") }
+            runCatching { MPVLib.setPropertyString("force-window", "no") }
         }
     }
 

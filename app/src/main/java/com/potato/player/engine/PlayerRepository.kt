@@ -235,17 +235,16 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
         currentTitle = ""
         resumePositionSec = 0.0
         hasSoughtOnStart = false
+        pendingSeekCommitSec = null
+        pendingSeekRelativeSec = 0
+        isSeekingGate = false
     }
-
-    fun cleanup() { repoScope.cancel(); engine.dispatcher.removeListener(this) }
-
     // ── MpvEventListener ─────────────────────────────────────────────────────
 
     override fun onFileLoaded() { _fileLoaded.value = true; _isLoading.value = false; loadTracks() }
     override fun onPlaybackStarted() {
         _isLoading.value = false
         _isPaused.value = false
-        engine.surface.markRendering()
         engine.executor.play()
         // Both ops run sequentially on Main: flush first so no pending seek can overwrite
         // the resume position that fires immediately after.
