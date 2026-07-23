@@ -57,19 +57,30 @@ class MpvEngine(context: Context) {
         }
     }
 
-    fun prepareDecoderSwitch(onReady: () -> Unit) {
-        // All supported decoders (no / mediacodec / mediacodec-copy) run under vo=gpu,
-        // so hwdec switches are transparent to the video output — MPV reinitialises the
-        // decoder on its own decode cycle without touching the surface.
-        //
-        // The previous detach+reattach dance caused a permanent black screen:
-        //   detachAndDisableVo(), onReady() (setDecoder), and reattachSurface() were
-        //   posted as three independent async tasks.  The latch in attachSequence fired
-        //   on the VO-teardown VIDEO_RECONFIG (already consumed before the listener was
-        //   even registered), then set vo=gpu — only for MPV's decoder-switch reconfig
-        //   to fire immediately after and orphan the surface with vo=null while audio
-        //   (running on an independent ao pipeline) stayed alive.
-        onReady()
+    fun prepareDecoderSwitch(hwdec: String) {
+        if (!initialized.get() || !executor.isAlive()) return
+        Log.d(TAG, "prepareDecoderSwitch: $hwdec")
+
+        // Everything runs in one executor slot so teardown → switch → reattach
+        // are strictly ordered with no inter-task races.
+        executor.execute {
+            if (!executor.isAlive()) return@execute
+
+            // 1. Tear down VO and detach the surface
+            runCatching { MPVLib.setPropertyString("vo", "null") }
+            runCatching { MPVLib.setPropertyString("force-window", "no") }
+            runCatching { MPVLib.detachSurface() }
+            Thread.sleep(100)   // let MPV's C-core fully process the VO teardown
+
+            // 2. Switch the decoder while the VO is dark
+            runCatching { MPVLib.setPropertyString("hwdec", hwdec) }
+            Thread.sleep(150)   // let the new decoder instance initialise
+
+            // 3. Reattach the surface and bring the VO back up.
+            //    reattachSurface() posts to the same executor, so it queues
+            //    *after* this block returns — safe, no deadlock.
+            surface.reattachSurface()
+        }
     }
 
     fun enterStandby() {

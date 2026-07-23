@@ -160,10 +160,8 @@ class PlayerRepository(val engine: MpvEngine) : MpvEventListener {
     }
 
     fun setDecoder(hwdec: String) {
-        engine.prepareDecoderSwitch {
-            engine.executor.setDecoder(hwdec)
-            _hwdecCurrent.value = when (hwdec) { "no" -> "SW"; "mediacodec" -> "HW"; else -> "HW+" }
-        }
+        _hwdecCurrent.value = when (hwdec) { "no" -> "SW"; "mediacodec" -> "HW"; else -> "HW+" }
+        engine.prepareDecoderSwitch(hwdec)
     }
 
     fun setPlaybackSpeed(speed: Double) {
