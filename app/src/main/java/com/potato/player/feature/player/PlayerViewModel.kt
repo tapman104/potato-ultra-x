@@ -195,7 +195,9 @@ class PlayerViewModel(private val wrapper: MpvWrapper) : ViewModel() {
     val surfaceCallback: SurfaceHolder.Callback get() = wrapper.surfaceCallback
 
     fun onSurfaceReady(uri: String, title: String = "") {
-        loadFile(uri, title)
+        if (currentUri != uri) {
+            loadFile(uri, title)
+        }
     }
 
     fun onSurfaceReattached() {
@@ -206,13 +208,7 @@ class PlayerViewModel(private val wrapper: MpvWrapper) : ViewModel() {
     }
 
     fun setSurfaceReadyCallback(cb: (() -> Unit)?) {
-        wrapper.onSurfaceReady = {
-            if (currentUri.isNotEmpty()) {
-                wrapper.play(currentUri)
-            } else {
-                cb?.invoke()
-            }
-        }
+        wrapper.onSurfaceReady = cb
     }
 
     fun onSurfaceDestroyed() {
