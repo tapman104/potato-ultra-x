@@ -15,6 +15,7 @@ class MpvWrapper(val context: Context) : MPVLib.EventObserver {
     val events: SharedFlow<MpvEvent> = _events.asSharedFlow()
 
     private val configurator = MpvOptionsConfigurator()
+    private var cachedPause: Boolean = false
 
     init {
         configurator.copyFontAssets(context)
@@ -82,8 +83,7 @@ class MpvWrapper(val context: Context) : MPVLib.EventObserver {
     }
 
     fun togglePlay() {
-        val paused = getPropertyInt("pause") == 1
-        MPVLib.setPropertyBoolean("pause", !paused)
+        MPVLib.setPropertyBoolean("pause", !cachedPause)
     }
 
     fun resume() {
@@ -133,13 +133,17 @@ class MpvWrapper(val context: Context) : MPVLib.EventObserver {
     fun getPropertyString(name: String): String? = MPVLib.getPropertyString(name)
 
     fun destroy() {
+        detachSurface()
         MPVLib.removeObserver(this)
         MPVLib.destroy()
     }
 
     override fun eventProperty(name: String) {}
     override fun eventProperty(name: String, value: Long) { _events.tryEmit(MpvEvent.PropertyLong(name, value)) }
-    override fun eventProperty(name: String, value: Boolean) { _events.tryEmit(MpvEvent.PropertyBool(name, value)) }
+    override fun eventProperty(name: String, value: Boolean) {
+        if (name == MpvProp.PAUSE) cachedPause = value
+        _events.tryEmit(MpvEvent.PropertyBool(name, value))
+    }
     override fun eventProperty(name: String, value: String) { _events.tryEmit(MpvEvent.PropertyString(name, value)) }
     override fun eventProperty(name: String, value: Double) { _events.tryEmit(MpvEvent.PropertyDouble(name, value)) }
     override fun eventProperty(name: String, value: MPVNode) {}
