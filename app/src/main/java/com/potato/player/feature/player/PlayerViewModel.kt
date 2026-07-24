@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class PlayerViewModel(private val wrapper: MpvWrapper) : ViewModel() {
 
@@ -40,7 +41,7 @@ class PlayerViewModel(private val wrapper: MpvWrapper) : ViewModel() {
     
     private var normalPlaybackSpeed = 1.0
     private var isSliderSeeking = false
-    private var pendingResumePosition: Long = 0L
+    @Volatile private var pendingResumePosition: Long = 0L
 
     init {
         viewModelScope.launch {
@@ -208,7 +209,13 @@ class PlayerViewModel(private val wrapper: MpvWrapper) : ViewModel() {
     }
 
     fun setSurfaceReadyCallback(cb: (() -> Unit)?) {
-        wrapper.onSurfaceReady = cb
+        wrapper.onSurfaceReady = {
+            if (currentUri.isNotEmpty()) {
+                wrapper.play(currentUri)
+            } else {
+                cb?.invoke()
+            }
+        }
     }
 
     fun setSurfaceReattachedCallback(cb: (() -> Unit)?) {
@@ -226,12 +233,12 @@ class PlayerViewModel(private val wrapper: MpvWrapper) : ViewModel() {
         _uiState.update { it.copy(isLoading = true, isPlaying = false, fileLoaded = false, error = null) }
         viewModelScope.launch(Dispatchers.IO) {
             val history = database.videoHistoryDao().getByUri(uri)
-            if (history != null && history.lastPlayedPositionSec > 0) {
-                pendingResumePosition = (history.lastPlayedPositionSec * 1000).toLong()
-            } else {
-                pendingResumePosition = 0L
+            pendingResumePosition = if (history != null && history.lastPlayedPositionSec > 0)
+                (history.lastPlayedPositionSec * 1000).toLong() else 0L
+            
+            withContext(Dispatchers.Main) {
+                wrapper.play(uri)
             }
-            wrapper.play(uri)
         }
     }
 

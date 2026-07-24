@@ -15,7 +15,7 @@ class MpvWrapper(val context: Context) : MPVLib.EventObserver {
     val events: SharedFlow<MpvEvent> = _events.asSharedFlow()
 
     private val configurator = MpvOptionsConfigurator()
-    private var cachedPause: Boolean = false
+    @Volatile private var cachedPause: Boolean = false
 
     init {
         configurator.copyFontAssets(context)
@@ -23,9 +23,6 @@ class MpvWrapper(val context: Context) : MPVLib.EventObserver {
         MPVLib.addObserver(this)
         
         configurator.initOptions(context)
-        MPVLib.setPropertyString("demuxer-max-bytes", MpvCache.MAX_BYTES)
-        MPVLib.setPropertyString("demuxer-max-back-bytes", MpvCache.MAX_BACK_BYTES)
-        MPVLib.setPropertyString("cache-secs", MpvCache.SECS)
         
         configurator.postInitOptions()
         configurator.registerPropertyObservers()
@@ -35,17 +32,11 @@ class MpvWrapper(val context: Context) : MPVLib.EventObserver {
 
     var onSurfaceReady: (() -> Unit)? = null
     var onSurfaceReattached: (() -> Unit)? = null
-    private var isFirstLoad = true
 
     val surfaceCallback = object : SurfaceHolder.Callback {
         override fun surfaceCreated(holder: SurfaceHolder) {
             attachSurface(holder.surface)
-            if (isFirstLoad) {
-                isFirstLoad = false
-                onSurfaceReady?.invoke()
-            } else {
-                onSurfaceReattached?.invoke()
-            }
+            onSurfaceReady?.invoke()
         }
 
         override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
@@ -73,27 +64,26 @@ class MpvWrapper(val context: Context) : MPVLib.EventObserver {
 
     fun play(uri: String) {
         MPVLib.command("loadfile", uri, "replace")
-        MPVLib.setPropertyBoolean("pause", false)
-        MPVLib.setPropertyString("demuxer-max-bytes", MpvCache.MAX_BYTES)
-        MPVLib.setPropertyString("demuxer-max-back-bytes", MpvCache.MAX_BACK_BYTES)
+        MPVLib.setPropertyBoolean(MpvProp.PAUSE, false)
     }
 
     fun pause() {
-        MPVLib.setPropertyBoolean("pause", true)
+        MPVLib.setPropertyBoolean(MpvProp.PAUSE, true)
     }
 
     fun togglePlay() {
-        MPVLib.setPropertyBoolean("pause", !cachedPause)
+        MPVLib.setPropertyBoolean(MpvProp.PAUSE, !cachedPause)
     }
 
     fun resume() {
         MPVLib.setOptionString("force-window", "yes")
         MPVLib.setPropertyString("vo", "gpu")
-        MPVLib.setPropertyBoolean("pause", false)
+        MPVLib.setPropertyBoolean(MpvProp.PAUSE, false)
     }
 
     fun seekTo(ms: Long) {
-        MPVLib.command("seek", (ms / 1000.0).toString(), "absolute+exact")
+        val safeMs = ms.coerceAtLeast(0L)
+        MPVLib.command("seek", (safeMs / 1000.0).toString(), "absolute+exact")
     }
 
     fun seekRelative(sec: Double) {
@@ -101,28 +91,28 @@ class MpvWrapper(val context: Context) : MPVLib.EventObserver {
     }
 
     fun setAudioTrack(id: Int) {
-        MPVLib.setPropertyString("aid", id.toString())
+        MPVLib.setPropertyString(MpvProp.AID, if (id == -1) "no" else id.toString())
     }
 
     fun setSubTrack(id: Int) {
         val valStr = if (id == -1) "no" else id.toString()
-        MPVLib.setPropertyString("sid", valStr)
+        MPVLib.setPropertyString(MpvProp.SID, valStr)
     }
 
     fun setSpeed(speed: Double) {
-        MPVLib.setPropertyString("speed", speed.toString())
+        MPVLib.setPropertyString(MpvProp.SPEED, speed.toString())
     }
 
     fun setDecoder(hwdec: String) {
-        MPVLib.setPropertyString("hwdec", hwdec)
+        MPVLib.setPropertyString(MpvProp.HWDEC, hwdec)
     }
 
     fun setSubScale(scale: Double) {
-        MPVLib.setPropertyDouble("sub-scale", scale)
+        MPVLib.setPropertyDouble(MpvProp.SUB_SCALE, scale)
     }
 
     fun setSubPos(pos: Int) {
-        MPVLib.setPropertyInt("sub-pos", pos)
+        MPVLib.setPropertyInt(MpvProp.SUB_POS, pos)
     }
 
     fun addExternalSubtitle(path: String) {
@@ -132,7 +122,11 @@ class MpvWrapper(val context: Context) : MPVLib.EventObserver {
     fun getPropertyInt(name: String): Int? = MPVLib.getPropertyInt(name)
     fun getPropertyString(name: String): String? = MPVLib.getPropertyString(name)
 
+    private var destroyed = false
+
     fun destroy() {
+        if (destroyed) return
+        destroyed = true
         detachSurface()
         MPVLib.removeObserver(this)
         MPVLib.destroy()

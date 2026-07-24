@@ -143,9 +143,7 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
         if (isFinishing) {
             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            mpvWrapper.destroy()
         }
-        // Actually wrapper.destroy() is called by PlayerViewModel's onCleared.
-        // But if we want to ensure it's destroyed, we can do it here if PlayerViewModel doesn't.
-        // Let's leave it to PlayerViewModel to destroy it, or maybe call wrapper.destroy() if finishing.
     }
 }

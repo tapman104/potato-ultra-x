@@ -30,8 +30,6 @@ internal object MpvEventId {
     const val FILE_LOADED      = 8
     const val END_FILE         = 7
     const val PLAYBACK_RESTART = 15
-    const val VIDEO_RECONFIG   = 17
-    const val SEEK             = 20
 }
 
 internal object MpvCache {
