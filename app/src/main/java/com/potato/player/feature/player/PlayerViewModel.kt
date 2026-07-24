@@ -21,9 +21,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import android.view.SurfaceHolder
 
 class PlayerViewModel(private val wrapper: MpvWrapper) : ViewModel() {
 
@@ -57,19 +59,17 @@ class PlayerViewModel(private val wrapper: MpvWrapper) : ViewModel() {
         }
 
         viewModelScope.launch {
-            prefsRepository.subScaleFlow.collect { scale ->
+            combine(
+                prefsRepository.subScaleFlow,
+                prefsRepository.subPosFlow,
+                prefsRepository.autoRotationFlow
+            ) { scale, pos, autoRot ->
+                Triple(scale, pos, autoRot)
+            }.collect { (scale, pos, autoRot) ->
                 wrapper.setSubScale(scale)
-                _uiState.update { it.copy(subScale = scale) }
-            }
-        }
-        viewModelScope.launch {
-            prefsRepository.subPosFlow.collect { pos ->
                 wrapper.setSubPos(pos)
-                _uiState.update { it.copy(subPos = pos) }
+                _uiState.update { it.copy(subScale = scale, subPos = pos, isAutoRotation = autoRot) }
             }
-        }
-        viewModelScope.launch {
-            prefsRepository.autoRotationFlow.collect { v -> _uiState.update { it.copy(isAutoRotation = v) } }
         }
     }
 
@@ -192,10 +192,7 @@ class PlayerViewModel(private val wrapper: MpvWrapper) : ViewModel() {
         _uiState.update { it.copy(tracks = list, currentAudioTrackId = aid, currentSubtitleTrackId = sid) }
     }
 
-    fun createSurfaceView(context: Context): View = SurfaceView(context).also { sv ->
-        sv.keepScreenOn = true
-        sv.holder.addCallback(wrapper.surfaceCallback)
-    }
+    val surfaceCallback: SurfaceHolder.Callback get() = wrapper.surfaceCallback
 
     fun onSurfaceReady(uri: String, title: String = "") {
         loadFile(uri, title)
@@ -218,13 +215,8 @@ class PlayerViewModel(private val wrapper: MpvWrapper) : ViewModel() {
         }
     }
 
-    fun setSurfaceReattachedCallback(cb: (() -> Unit)?) {
-        wrapper.onSurfaceReattached = cb
-    }
-    
     fun onSurfaceDestroyed() {
         wrapper.onSurfaceReady = null
-        wrapper.onSurfaceReattached = null
     }
 
     fun loadFile(uri: String, title: String = "") {

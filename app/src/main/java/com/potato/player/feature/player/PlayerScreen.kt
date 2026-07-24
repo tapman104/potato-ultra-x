@@ -3,6 +3,7 @@ package com.potato.player.feature.player
 import android.os.Build
 import android.app.PictureInPictureParams
 import androidx.compose.animation.*
+import android.view.SurfaceView
 import com.potato.player.util.MediaMetadataRepository
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -88,10 +89,8 @@ fun PlayerScreen(
     // Load the video once the surface is ready; also handles config-change re-attach.
     DisposableEffect(viewModel, videoUri) {
         viewModel.setSurfaceReadyCallback { viewModel.onSurfaceReady(videoUri, title) }
-        viewModel.setSurfaceReattachedCallback { viewModel.onSurfaceReattached() }
         onDispose {
             viewModel.setSurfaceReadyCallback(null)
-            viewModel.setSurfaceReattachedCallback(null)
             viewModel.onSurfaceDestroyed()
         }
     }
@@ -104,7 +103,12 @@ fun PlayerScreen(
 
         // ── Video surface ────────────────────────────────────────────────────
         AndroidView(
-            factory = { ctx -> viewModel.createSurfaceView(ctx) },
+            factory = { ctx ->
+                SurfaceView(ctx).also { sv ->
+                    sv.keepScreenOn = true
+                    sv.holder.addCallback(viewModel.surfaceCallback)
+                }
+            },
             modifier = Modifier.fillMaxSize()
         )
 

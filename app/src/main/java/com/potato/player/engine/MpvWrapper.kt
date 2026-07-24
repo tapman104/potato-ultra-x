@@ -31,7 +31,6 @@ class MpvWrapper(val context: Context) : MPVLib.EventObserver {
     }
 
     var onSurfaceReady: (() -> Unit)? = null
-    var onSurfaceReattached: (() -> Unit)? = null
 
     val surfaceCallback = object : SurfaceHolder.Callback {
         override fun surfaceCreated(holder: SurfaceHolder) {
