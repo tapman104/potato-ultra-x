@@ -10,8 +10,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.toRoute
-import com.potato.player.engine.MpvEngine
-import com.potato.player.engine.PlayerRepository
+import com.potato.player.engine.MpvWrapper
 import com.potato.player.feature.home.HomeScreen
 import com.potato.player.feature.player.PlayerScreen
 import com.potato.player.feature.player.PlayerViewModel
@@ -31,8 +30,7 @@ data class PlayerRoute(
 @Composable
 fun AppNavigation(
     navController: NavHostController,
-    engine: MpvEngine,
-    repository: PlayerRepository
+    wrapper: MpvWrapper
 ) {
     NavHost(
         navController = navController,
@@ -52,7 +50,6 @@ fun AppNavigation(
 
             DisposableEffect(route.videoUri) {
                 onDispose {
-                    repository.enterStandby()
                     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || activity?.isInPictureInPictureMode != true) {
                         activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
                     }
@@ -60,7 +57,7 @@ fun AppNavigation(
             }
 
             val playerViewModel: PlayerViewModel = viewModel(
-                factory = PlayerViewModelFactory(repository)
+                factory = PlayerViewModelFactory(wrapper)
             )
 
             PlayerScreen(

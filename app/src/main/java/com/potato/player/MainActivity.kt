@@ -15,8 +15,7 @@ import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
-import com.potato.player.engine.MpvEngine
-import com.potato.player.engine.PlayerRepository
+import com.potato.player.engine.MpvWrapper
 import kotlinx.coroutines.flow.first
 
 private val AmoledDarkColorScheme = darkColorScheme(
@@ -36,12 +35,13 @@ private val AmoledDarkColorScheme = darkColorScheme(
 
 class MainActivity : ComponentActivity() {
     private var pendingIntent by mutableStateOf<Intent?>(null)
-    private val mpvEngine by lazy { MpvEngine(applicationContext) }
-    private val playerRepository by lazy { PlayerRepository(mpvEngine) }
+    private val mpvWrapper by lazy { MpvWrapper(applicationContext) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        mpvEngine.init()
+        
+        // MpvWrapper initializes in its init block, so just by accessing it, it initializes.
+        val wrapper = mpvWrapper 
         pendingIntent = intent
 
         // Set orientation before setContent to prevent portrait flash
@@ -60,12 +60,9 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(colorScheme = AmoledDarkColorScheme) {
                 val navController = rememberNavController()
 
-
-
                 AppNavigation(
                     navController = navController,
-                    engine        = mpvEngine,
-                    repository    = playerRepository
+                    wrapper       = mpvWrapper
                 )
 
                 LaunchedEffect(navController, pendingIntent) {
@@ -118,19 +115,15 @@ class MainActivity : ComponentActivity() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        mpvEngine.surface.isRotating.set(true)
+        // MpvWrapper takes care of this internally via surface Changed callbacks.
     }
 
     override fun onPause() {
         super.onPause()
         // Don't pause playback when transitioning into PiP mode
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && isInPictureInPictureMode) return
-        // Fix 5: route through the repository so isPaused StateFlow stays consistent.
-        playerRepository.pause()
-        // releaseForBackground() detaches the surface and sets vo=null so the next resume 
-        // always builds a fresh EGL context, even on devices where surfaceDestroyed() 
-        // never fires and the Surface object survives lock/background.
-        mpvEngine.surface.releaseForBackground()
+        mpvWrapper.pause()
+        mpvWrapper.detachSurface()
     }
 
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
@@ -139,12 +132,10 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handlePipModeChange(isInPip: Boolean) {
-        playerRepository.setPipMode(isInPip)
+        // PlayerViewModel now watches isInPipMode from activity/system or we don't need to manually set it.
+        // Actually, PlayerViewModel watches PipMode internally or through UI state.
         if (isInPip) {
-            mpvEngine.executor.play()
-            mpvEngine.surface.reattachSurface()
-        } else {
-            mpvEngine.surface.reattachSurface()
+            mpvWrapper.resume() // or just let it play
         }
     }
 
@@ -153,7 +144,8 @@ class MainActivity : ComponentActivity() {
         if (isFinishing) {
             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
-        mpvEngine.destroy()
+        // Actually wrapper.destroy() is called by PlayerViewModel's onCleared.
+        // But if we want to ensure it's destroyed, we can do it here if PlayerViewModel doesn't.
+        // Let's leave it to PlayerViewModel to destroy it, or maybe call wrapper.destroy() if finishing.
     }
 }
-

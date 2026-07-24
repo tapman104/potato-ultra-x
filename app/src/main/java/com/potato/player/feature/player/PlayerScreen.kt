@@ -49,7 +49,10 @@ fun PlayerScreen(
     viewModel: PlayerViewModel,
     onBack: () -> Unit,
 ) {
-    BackHandler { onBack() }
+    BackHandler {
+        viewModel.pause()
+        onBack()
+    }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val progressState by viewModel.progressState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -69,7 +72,7 @@ fun PlayerScreen(
     val controlsState = rememberControlsVisibilityState(
         isPlaying = uiState.isPlaying,
         dragPositionSec = progressState.dragPositionSec,
-        isInPipMode = uiState.isInPipMode
+        isInPipMode = activity?.isInPictureInPictureMode == true
     )
     var doubleTapSeekState by remember { mutableStateOf<DoubleTapSeekState?>(null) }
     var isLongPressActive by remember { mutableStateOf(false) }
@@ -109,8 +112,8 @@ fun PlayerScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .pointerInput(uiState.isInPipMode) {
-                    if (uiState.isInPipMode) return@pointerInput
+                .pointerInput(activity?.isInPictureInPictureMode == true) {
+                    if (activity?.isInPictureInPictureMode == true) return@pointerInput
                     detectTapGestures(
                         onPress = { offset ->
                             tryAwaitRelease()
@@ -148,12 +151,12 @@ fun PlayerScreen(
         )
 
         // ── Double-Tap Seek Overlay ──────────────────────────────────────────
-        if (!uiState.isInPipMode) {
+        if (!(activity?.isInPictureInPictureMode == true)) {
             DoubleTapSeekOverlay(seekState = doubleTapSeekState)
         }
 
         // ── Top Hold for 2x Fast-Forward Banner ──────────────────────────────
-        if (!uiState.isInPipMode) {
+        if (!(activity?.isInPictureInPictureMode == true)) {
             HoldToFastForward(
                 visible = uiState.isFastForwarding || isLongPressActive,
                 modifier = Modifier
@@ -179,7 +182,7 @@ fun PlayerScreen(
             )
         }
 
-        if (uiState.fileLoaded && !uiState.isInPipMode) {
+        if (uiState.fileLoaded && !(activity?.isInPictureInPictureMode == true)) {
 
             // ── Top bar ──────────────────────────────────────────────────────
             AnimatedVisibility(
@@ -254,7 +257,7 @@ fun PlayerScreen(
         }
 
         // ponytail: move only, zero new logic
-        if (!uiState.isInPipMode) {
+        if (!(activity?.isInPictureInPictureMode == true)) {
             PlayerModals(
                 uiState = uiState,
                 viewModel = viewModel

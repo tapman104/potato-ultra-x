@@ -26,7 +26,7 @@ internal object MpvFmt {
     const val INT64  = 6
 }
 
-internal object MpvEvent {
+internal object MpvEventId {
     const val FILE_LOADED      = 8
     const val END_FILE         = 7
     const val PLAYBACK_RESTART = 15

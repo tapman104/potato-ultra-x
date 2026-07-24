@@ -6,21 +6,28 @@ import android.view.SurfaceView
 import android.view.View
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.potato.player.data.AppDatabase
 import com.potato.player.data.UserPreferencesRepository
-import com.potato.player.engine.PlayerRepository
+import com.potato.player.data.VideoHistory
+import com.potato.player.engine.MpvWrapper
+import com.potato.player.engine.MpvEvent
+import com.potato.player.engine.MpvEventId
+import com.potato.player.engine.MpvProp
 import com.potato.player.engine.TrackInfo
+import com.potato.player.engine.TrackType
+import com.potato.player.feature.player.PlayerUiConstants
 import com.potato.player.util.MediaMetadataRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
+class PlayerViewModel(private val wrapper: MpvWrapper) : ViewModel() {
 
-    private val prefsRepository by lazy { UserPreferencesRepository(repository.engine.context) }
+    private val prefsRepository by lazy { UserPreferencesRepository(wrapper.context) }
+    private val database by lazy { AppDatabase.getInstance(wrapper.context) }
 
     private val _uiState = MutableStateFlow(PlayerUiState())
     val uiState: StateFlow<PlayerUiState> = _uiState.asStateFlow()
@@ -30,150 +37,210 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
 
     private var currentUri = ""
     private var currentTitle = ""
+    
+    private var normalPlaybackSpeed = 1.0
+    private var isSliderSeeking = false
+    private var pendingResumePosition: Long = 0L
 
     init {
-        // [A1] combine high-frequency progress flows into progressState
         viewModelScope.launch {
-            combine(
-                repository.positionSec,
-                repository.durationSec,
-                repository.cachedSec,
-                repository.cacheDurationSec
-            ) { pos, dur, cached, cacheDur ->
-                _progressState.update {
-                    it.copy(
-                        positionSec = pos,
-                        durationSec = dur,
-                        cachedSec = cached,
-                        cacheDurationSec = cacheDur
-                    )
+            wrapper.events.collect { event ->
+                when (event) {
+                    is MpvEvent.Id -> handleMpvEventId(event.id)
+                    is MpvEvent.PropertyBool -> handlePropertyBool(event.name, event.value)
+                    is MpvEvent.PropertyDouble -> handlePropertyDouble(event.name, event.value)
+                    is MpvEvent.PropertyLong -> handlePropertyLong(event.name, event.value)
+                    is MpvEvent.PropertyString -> handlePropertyString(event.name, event.value)
                 }
-            }.collect {}
-        }
-
-        // [A2] group tracks and track selections
-        viewModelScope.launch {
-            combine(repository.tracks, repository.currentAudioTrackId, repository.currentSubtitleTrackId) { tracks, audioId, subId ->
-                Triple(tracks, audioId, subId)
-            }.collect { (tracks, audioId, subId) ->
-                _uiState.update { it.copy(tracks = tracks, currentAudioTrackId = audioId, currentSubtitleTrackId = subId) }
             }
         }
 
-        // [A2] group playback control and speed states
         viewModelScope.launch {
-            combine(repository.isPaused, repository.playbackSpeed, repository.isFastForwarding) { paused, speed, ff ->
-                Triple(paused, speed, ff)
-            }.collect { (paused, speed, ff) ->
-                _uiState.update { it.copy(isPlaying = !paused, playbackSpeed = speed, isFastForwarding = ff) }
+            prefsRepository.subScaleFlow.collect { scale ->
+                wrapper.setSubScale(scale)
+                _uiState.update { it.copy(subScale = scale) }
             }
         }
-
-        // [A2] group file loading states
         viewModelScope.launch {
-            combine(repository.fileLoaded, repository.isLoading) { loaded, loading ->
-                Pair(loaded, loading)
-            }.collect { (loaded, loading) ->
-                _uiState.update { it.copy(fileLoaded = loaded, isLoading = loading) }
+            prefsRepository.subPosFlow.collect { pos ->
+                wrapper.setSubPos(pos)
+                _uiState.update { it.copy(subPos = pos) }
             }
         }
-
-        // [A2] group subtitle appearance states
-        viewModelScope.launch {
-            combine(repository.subScale, repository.subPos) { scale, pos ->
-                Pair(scale, pos)
-            }.collect { (scale, pos) ->
-                _uiState.update { it.copy(subScale = scale, subPos = pos) }
-            }
-        }
-
-        // [A2] group video parameters and display properties
-        viewModelScope.launch {
-            combine(
-                repository.videoWidth,
-                repository.videoHeight,
-                repository.isInPipMode,
-                repository.hwdecCurrent
-            ) { w, h, pip, hwdec ->
-                _uiState.update { it.copy(videoWidth = w, videoHeight = h, isInPipMode = pip, hwdecCurrent = hwdec) }
-            }.collect {}
-        }
-
-        // [A2] combine preference syncs
-        viewModelScope.launch {
-            combine(prefsRepository.subScaleFlow, prefsRepository.subPosFlow) { scale, pos ->
-                repository.setSubScale(scale)
-                repository.setSubPos(pos)
-            }.collect {}
-        }
-
         viewModelScope.launch {
             prefsRepository.autoRotationFlow.collect { v -> _uiState.update { it.copy(isAutoRotation = v) } }
         }
+    }
 
-        // ponytail: initResult has unique error/lifecycle side effects so kept separate
-        viewModelScope.launch {
-            repository.initResult.collect { result ->
-                if (result.isSuccess) {
-                    _uiState.update { it.copy(error = null) }
-                } else {
-                    val msg = result.exceptionOrNull()?.message ?: "Unknown error"
-                    _uiState.update { it.copy(error = msg, isLoading = false) }
+    private fun handleMpvEventId(id: Int) {
+        when (id) {
+            MpvEventId.FILE_LOADED -> {
+                _uiState.update { it.copy(fileLoaded = true, isLoading = false) }
+                loadTracks()
+                if (pendingResumePosition > 0L) {
+                    wrapper.seekTo(pendingResumePosition)
+                    pendingResumePosition = 0L
+                }
+            }
+            MpvEventId.PLAYBACK_RESTART -> {
+                _uiState.update { it.copy(isLoading = false, isPlaying = true) }
+            }
+            MpvEventId.END_FILE -> {
+                _uiState.update { it.copy(isPlaying = false) }
+                saveHistoryIfNeeded()
+                if (_uiState.value.isFastForwarding) {
+                    _uiState.update { it.copy(isFastForwarding = false) }
+                    wrapper.setSpeed(normalPlaybackSpeed)
                 }
             }
         }
+    }
+
+    private fun handlePropertyBool(name: String, value: Boolean) {
+        if (name == MpvProp.PAUSE) {
+            _uiState.update { it.copy(isPlaying = !value) }
+        }
+    }
+
+    private fun handlePropertyDouble(name: String, value: Double) {
+        when (name) {
+            MpvProp.TIME_POS -> {
+                if (!isSliderSeeking) _progressState.update { it.copy(positionSec = value) }
+            }
+            MpvProp.DURATION -> _progressState.update { it.copy(durationSec = value) }
+            MpvProp.DEMUXER_CACHE_TIME -> _progressState.update { it.copy(cachedSec = value) }
+            MpvProp.DEMUXER_CACHE_DURATION -> _progressState.update { it.copy(cacheDurationSec = value) }
+            MpvProp.SPEED -> {
+                if (!_uiState.value.isFastForwarding) {
+                    _uiState.update { it.copy(playbackSpeed = value) }
+                    normalPlaybackSpeed = value
+                }
+            }
+            MpvProp.SUB_SCALE -> _uiState.update { it.copy(subScale = value) }
+        }
+    }
+
+    private fun handlePropertyLong(name: String, value: Long) {
+        when (name) {
+            MpvProp.SUB_POS -> _uiState.update { it.copy(subPos = value.toInt()) }
+            MpvProp.VIDEO_PARAMS_W -> _uiState.update { it.copy(videoWidth = value.toInt()) }
+            MpvProp.VIDEO_PARAMS_H -> _uiState.update { it.copy(videoHeight = value.toInt()) }
+        }
+    }
+
+    private fun handlePropertyString(name: String, value: String) {
+        when (name) {
+            MpvProp.HWDEC_CURRENT -> {
+                val hwdec = when {
+                    value == "no" || value.isEmpty() -> "SW"
+                    value.contains("copy") -> "HW+"
+                    else -> "HW"
+                }
+                _uiState.update { it.copy(hwdecCurrent = hwdec) }
+            }
+            "track-list" -> {
+                val tracks = parseTrackList(value)
+                if (tracks.isNotEmpty()) {
+                    _uiState.update { it.copy(tracks = tracks) }
+                } else {
+                    loadTracks()
+                }
+            }
+        }
+    }
+
+    private fun parseTrackList(raw: String): List<TrackInfo> {
+        return try {
+            val arr = org.json.JSONArray(raw)
+            (0 until arr.length()).mapNotNull { i ->
+                val obj = arr.getJSONObject(i)
+                val typeStr = obj.optString("type", "")
+                val type = when (typeStr) {
+                    "audio" -> TrackType.AUDIO
+                    "sub" -> TrackType.SUBTITLE
+                    else -> return@mapNotNull null
+                }
+                TrackInfo(
+                    id = obj.getInt("id"),
+                    type = type,
+                    title = obj.optString("title", "").takeIf { it.isNotBlank() },
+                    lang = obj.optString("lang", "").takeIf { it.isNotBlank() },
+                    isExternal = obj.optBoolean("external", false)
+                )
+            }
+        } catch (e: Exception) { emptyList() }
+    }
+
+    private fun loadTracks() {
+        val count = wrapper.getPropertyInt(MpvProp.TRACK_LIST_COUNT) ?: 0
+        val list = mutableListOf<TrackInfo>()
+        for (i in 0 until count) {
+            val trackType = when (wrapper.getPropertyString("track-list/$i/type")) {
+                "audio" -> TrackType.AUDIO
+                "sub"   -> TrackType.SUBTITLE
+                else    -> continue
+            }
+            val id = wrapper.getPropertyInt("track-list/$i/id") ?: continue
+            val title = wrapper.getPropertyString("track-list/$i/title")
+            val lang = wrapper.getPropertyString("track-list/$i/lang")
+            val extStr = wrapper.getPropertyString("track-list/$i/external")
+            list.add(TrackInfo(id = id, type = trackType, title = title, lang = lang, isExternal = extStr == "yes" || extStr == "true"))
+        }
+        val aid = wrapper.getPropertyString(MpvProp.AID)?.toIntOrNull() ?: -1
+        val sid = wrapper.getPropertyString(MpvProp.SID)?.toIntOrNull() ?: -1
+        _uiState.update { it.copy(tracks = list, currentAudioTrackId = aid, currentSubtitleTrackId = sid) }
     }
 
     fun createSurfaceView(context: Context): View = SurfaceView(context).also { sv ->
         sv.keepScreenOn = true
-        sv.holder.addCallback(repository.engine.surface)
+        sv.holder.addCallback(wrapper.surfaceCallback)
     }
 
     fun onSurfaceReady(uri: String, title: String = "") {
-        currentUri = uri
-        currentTitle = title
-        repository.loadFile(uri, title)
+        loadFile(uri, title)
     }
 
     fun onSurfaceReattached() {
-        resumeAfterSurfaceReattach()
+        if (!_uiState.value.fileLoaded) return
+        if (_uiState.value.isPlaying) {
+            wrapper.resume()
+        }
     }
 
     fun setSurfaceReadyCallback(cb: (() -> Unit)?) {
-        repository.engine.surface.setSurfaceReadyCallback(cb)
+        wrapper.onSurfaceReady = cb
     }
 
     fun setSurfaceReattachedCallback(cb: (() -> Unit)?) {
-        repository.engine.surface.setSurfaceReattachedCallback(cb)
+        wrapper.onSurfaceReattached = cb
     }
-
+    
     fun onSurfaceDestroyed() {
-        repository.engine.surface.setSurfaceReadyCallback(null)
-        repository.engine.surface.setSurfaceReattachedCallback(null)
+        wrapper.onSurfaceReady = null
+        wrapper.onSurfaceReattached = null
     }
 
     fun loadFile(uri: String, title: String = "") {
         currentUri = uri
         currentTitle = title
-        repository.loadFile(uri, title)
-    }
-
-    /**
-     * Called when the SurfaceView is re-created after the app returns from Recents.
-     * Reattaches the MPV surface without restarting the file, then resumes playback
-     * only if the player was already playing before backgrounding.
-     */
-    fun resumeAfterSurfaceReattach() {
-        if (!_uiState.value.fileLoaded) return
-        repository.engine.surface.reattachSurface()
-        if (_uiState.value.isPlaying) {
-            repository.play()
+        _uiState.update { it.copy(isLoading = true, isPlaying = false, fileLoaded = false, error = null) }
+        viewModelScope.launch(Dispatchers.IO) {
+            val history = database.videoHistoryDao().getByUri(uri)
+            if (history != null && history.lastPlayedPositionSec > 0) {
+                pendingResumePosition = (history.lastPlayedPositionSec * 1000).toLong()
+            } else {
+                pendingResumePosition = 0L
+            }
+            wrapper.play(uri)
         }
     }
 
     fun togglePlay() {
-        _uiState.update { it.copy(isPlaying = !it.isPlaying) }
-        repository.togglePlay()
+        wrapper.togglePlay()
+    }
+    
+    fun pause() {
+        wrapper.pause()
     }
 
     fun cycleOrientationMode() {
@@ -192,38 +259,53 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
     }
 
     fun setDecoder(mode: String) {
-        repository.setDecoder(mode)
+        val hwdec = when (mode) { "no" -> "SW"; "mediacodec" -> "HW"; else -> "HW+" }
+        _uiState.update { it.copy(hwdecCurrent = hwdec) }
+        wrapper.setDecoder(mode)
     }
 
     fun seekRelative(offsetSec: Double) {
-        repository.seekRelative(offsetSec)
+        val target = (_progressState.value.positionSec + offsetSec).coerceIn(0.0, _progressState.value.durationSec.takeIf { it > 0.0 } ?: Double.MAX_VALUE)
+        wrapper.seekTo((target * 1000).toLong())
     }
 
     fun seekExactRelative(offsetSec: Int) {
-        repository.seekExactRelative(offsetSec)
+        wrapper.seekRelative(offsetSec.toDouble())
     }
 
     fun startFastForward() {
-        repository.startFastForward()
+        if (!_uiState.value.isFastForwarding) {
+            normalPlaybackSpeed = _uiState.value.playbackSpeed
+            _uiState.update { it.copy(isFastForwarding = true) }
+            wrapper.setSpeed(2.0)
+        }
     }
 
     fun stopFastForward() {
-        repository.stopFastForward()
+        if (_uiState.value.isFastForwarding) {
+            _uiState.update { it.copy(isFastForwarding = false) }
+            wrapper.setSpeed(normalPlaybackSpeed)
+            _uiState.update { it.copy(playbackSpeed = normalPlaybackSpeed) }
+        }
     }
 
     fun onSliderDragStart(posSec: Double) {
-        repository.onSliderDragStart()
+        isSliderSeeking = true
         _progressState.update { it.copy(dragPositionSec = posSec) }
     }
 
     fun onSliderDragChange(posSec: Double) {
         _progressState.update { it.copy(dragPositionSec = posSec) }
-        repository.seekGesture(posSec)
+        // The old code used seekGesture which just stored a value, but since MPV has its own thread and queue
+        // we could just use absolute+exact if we want to seek during drag. Since we deleted the debouncer,
+        // it's better not to spam it, but actually `seekTo` should be fine. However, old `seekGesture`
+        // was non-blocking. MPV natively drops rapidly queued seeks anyway. Let's do `seekTo`.
+        wrapper.seekTo((posSec * 1000).toLong())
     }
 
     fun onSliderDragEnd(posSec: Double) {
-        repository.seekCommit(posSec)
-        repository.onSliderDragEnd()
+        isSliderSeeking = false
+        wrapper.seekTo((posSec * 1000).toLong())
         _progressState.update { it.copy(dragPositionSec = null) }
     }
 
@@ -270,17 +352,22 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
     }
 
     fun setPlaybackSpeed(speed: Double) {
-        repository.setPlaybackSpeed(speed)
+        val clamped = speed.coerceIn(0.25, 4.0)
+        normalPlaybackSpeed = clamped
+        if (!_uiState.value.isFastForwarding) {
+            _uiState.update { it.copy(playbackSpeed = clamped) }
+            wrapper.setSpeed(clamped)
+        }
     }
 
     fun onSelectAudioTrack(id: Int) {
-        repository.setAudioTrack(id)
+        wrapper.setAudioTrack(id)
         _uiState.update { it.copy(currentAudioTrackId = id) }
         onDismissAudioDialog()
     }
 
     fun onSelectSubtitleTrack(id: Int) {
-        repository.setSubtitleTrack(id)
+        wrapper.setSubTrack(id)
         _uiState.update { it.copy(currentSubtitleTrackId = id) }
         onDismissSubtitleDialog()
     }
@@ -288,17 +375,19 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
     fun onLoadExternalSubtitle(uri: Uri, context: Context) {
         viewModelScope.launch(Dispatchers.IO) {
             val path = MediaMetadataRepository.resolveSubtitlePath(context, uri) ?: uri.toString()
-            repository.addExternalSubtitle(path)
+            wrapper.addExternalSubtitle(path)
+            // Reload tracks to reflect new subtitle
+            loadTracks()
         }
         onDismissSubtitleDialog()
     }
 
-    fun setSubScale(scale: Double) { repository.setSubScale(scale) }
-    fun setSubPos(pos: Int) { repository.setSubPos(pos) }
+    fun setSubScale(scale: Double) { wrapper.setSubScale(scale) }
+    fun setSubPos(pos: Int) { wrapper.setSubPos(pos) }
 
     fun setSubtitleAppearance(scale: Double, pos: Int) {
-        repository.setSubScale(scale)
-        repository.setSubPos(pos)
+        wrapper.setSubScale(scale)
+        wrapper.setSubPos(pos)
         viewModelScope.launch {
             prefsRepository.setSubScale(scale)
             prefsRepository.setSubPos(pos)
@@ -306,16 +395,31 @@ class PlayerViewModel(private val repository: PlayerRepository) : ViewModel() {
     }
 
     fun resetSubtitleAppearance() {
-        repository.setSubScale(PlayerUiConstants.DEFAULT_SUBTITLE_SCALE)
-        repository.setSubPos(PlayerUiConstants.DEFAULT_SUBTITLE_POSITION)
+        wrapper.setSubScale(PlayerUiConstants.DEFAULT_SUBTITLE_SCALE)
+        wrapper.setSubPos(PlayerUiConstants.DEFAULT_SUBTITLE_POSITION)
         viewModelScope.launch {
             prefsRepository.setSubScale(PlayerUiConstants.DEFAULT_SUBTITLE_SCALE)
             prefsRepository.setSubPos(PlayerUiConstants.DEFAULT_SUBTITLE_POSITION)
         }
     }
 
+    private fun saveHistoryIfNeeded() {
+        if (currentUri.isEmpty() || _progressState.value.durationSec <= 0.0) return
+        val entry = VideoHistory(
+            uri = currentUri,
+            title = currentTitle.ifEmpty { currentUri.substringAfterLast('/') },
+            lastPlayedPositionSec = _progressState.value.positionSec,
+            durationSec = _progressState.value.durationSec,
+            lastAudioTrackId = _uiState.value.currentAudioTrackId,
+            lastSubtitleTrackId = _uiState.value.currentSubtitleTrackId,
+            lastPlayedTimestamp = System.currentTimeMillis()
+        )
+        viewModelScope.launch(Dispatchers.IO) { database.videoHistoryDao().upsert(entry) }
+    }
+
     override fun onCleared() {
         super.onCleared()
-        repository.enterStandby()
+        saveHistoryIfNeeded()
+        wrapper.destroy()
     }
 }
